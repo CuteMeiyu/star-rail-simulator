@@ -1,10 +1,10 @@
 import random
 from dataclasses import dataclass
-from enum import Flag, auto
 from typing import Any
 
 from .combat import Unit
 from .event import Event, trigger
+from .flexflag import FlexFlag
 from .source import Source
 from .stats import *
 
@@ -18,16 +18,16 @@ class EventDamage(Event):
     damage: "Damage"
 
 
-class DamageFlag(Flag):
-    basic = auto()
-    skill = auto()
-    ult = auto()
-    dot = auto()
-    fua = auto()
-    counter = auto()
-    additional = auto()
-    breaking = auto()
-    super_break = auto()
+class DamageFlag(FlexFlag):
+    basic: "DamageFlag"
+    skill: "DamageFlag"
+    ult: "DamageFlag"
+    dot: "DamageFlag"
+    fua: "DamageFlag"
+    counter: "DamageFlag"
+    additional: "DamageFlag"
+    breaking: "DamageFlag"
+    super_break: "DamageFlag"
 
 
 class Damage(Source):
