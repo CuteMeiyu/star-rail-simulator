@@ -1,5 +1,7 @@
 import math as _math
 from contextlib import contextmanager as _contextmanager
+from copy import deepcopy as _deepcopy
+from enum import StrEnum as _StrEnum
 from typing import Any as _Any
 from typing import Generic as _Generic
 from typing import Literal as _Literal
@@ -120,11 +122,20 @@ class Weaken(_SimpleStat):
     pass
 
 
-DebuffName = _Literal["Bleed", "Burn", "Shock", "Wind Shear", "Frozen", "Entanglement", "Imprisonment", "Control", "Debuff"]
+class Debuffs(_StrEnum):
+    Bleed = "Bleed"
+    Burn = "Burn"
+    Shock = "Shock"
+    WindShear = "Wind Shear"
+    Frozen = "Frozen"
+    Entanglement = "Entanglement"
+    Imprisonment = "Imprisonment"
+    Control = "Control"
+    Debuff = "Debuff"
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, debuff_name: DebuffName = "Debuff") -> None:
+    def __init__(self, value=0.0, debuff_name: Debuffs = Debuffs.Debuff) -> None:
         self.debuff_name = debuff_name
         self.multipiers: dict[str, float] = {debuff_name: 1 - value}
 
@@ -136,7 +147,7 @@ class Effect_RES(Stat[float]):
                 self.multipiers[debuff_name] = value
         return self
 
-    def get_multipier(self, debuff_name: DebuffName = "Debuff"):
+    def get_multipier(self, debuff_name: Debuffs = Debuffs.Debuff):
         return 1 - self.multipiers[debuff_name]
 
     def get_value(self) -> float:
@@ -157,8 +168,8 @@ class DMG_Mitigation(Stat[float]):
         return 1 - self.value
 
 
-class _GroupStat(Stat[tuple[str, ...]]):
-    def __init__(self, *value: str):
+class _GroupStat(Stat[tuple[_T, ...]], _Generic[_T]):
+    def __init__(self, *value: _T):
         self.value = set(value)
 
     def __iadd__(self, other: _Self):
@@ -169,15 +180,36 @@ class _GroupStat(Stat[tuple[str, ...]]):
         return tuple(self.value)
 
 
-class Weakness(_GroupStat):
+class CombatTypes(_StrEnum):
+    Physical = "Physical"
+    Fire = "Fire"
+    Lightning = "Lightning"
+    Wind = "Wind"
+    Ice = "Ice"
+    Quantum = "Quantum"
+    Imaginary = "Imaginary"
+
+
+class Paths(_StrEnum):
+    Destruction = "Destruction"
+    Preservation = "Preservation"
+    Hunt = "Hunt"
+    Erudition = "Erudition"
+    Nihility = "Nihility"
+    Harmony = "Harmony"
+    Abundance = "Abundance"
+    Remembrance = "Remembrance"
+
+
+class Weakness(_GroupStat[CombatTypes]):
     pass
 
 
-class Path(_GroupStat):
+class Path(_GroupStat[Paths]):
     pass
 
 
-class CombatType(_GroupStat):
+class CombatType(_GroupStat[CombatTypes]):
     pass
 
 
@@ -214,7 +246,7 @@ _T_Stat = _TypeVar("_T_Stat", bound=Stat)
 
 class Stats:
     def __init__(self, *stats: Stat[_Any], comment="") -> None:
-        self.stats: list[Stat] = list(stats)
+        self.stats: list[Stat[_Any]] = list(stats)
         self.children: list[Stats] = []
         self.comment = comment
 
@@ -224,7 +256,7 @@ class Stats:
         while len(stack) > 0:
             child = stack.pop()
             for s in child.stats:
-                if isinstance(s, stat_type):
+                if type(s) is stat_type:
                     stat += s
             if not no_child:
                 stack.extend(child.children)
@@ -232,6 +264,9 @@ class Stats:
 
     def get(self, stat_type: type[Stat[_T]], no_child=False, **kwargs: _Any) -> _T:
         return self.get_stat(stat_type, no_child, **kwargs).get_value()
+
+    def deepcopy(self):
+        return _deepcopy(self)
 
     @_contextmanager
     def temp(self, temp_stats: "Stats | None" = None):

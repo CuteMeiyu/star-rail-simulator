@@ -69,6 +69,7 @@ class ReviveNode(Node, Source):
 @dataclass
 class Status:
     hp: float
+    energy: float
     alive: bool
 
 
@@ -78,7 +79,11 @@ class Unit(Runner, Source):
         Source.__init__(self, None)
         self.name = name
         self.stats = stats
-        self.status = Status(self.stats.get(HP), True)
+        self.status = Status(
+            hp=self.stats.get(HP),
+            energy=self.stats.get(Energy),
+            alive=True,
+        )
         self.team = team
         self.mods: list[Mod] = []
         team.add_unit(self)
@@ -111,6 +116,12 @@ class Unit(Runner, Source):
 
     def get_ally(self):
         return self.team.get_units()
+
+    def gain_energy(self, amount: float, fixed: bool):
+        if not fixed:
+            amount *= 1.0 + self.stats.get(Energy_Regeneration_Rate)
+        self.status.energy += amount
+        self.status.energy = min(self.status.energy, self.stats.get(Energy))
 
 
 class Team:

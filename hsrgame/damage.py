@@ -19,15 +19,19 @@ class EventDamage(Event):
 
 
 class DamageFlag(FlexFlag):
-    basic: "DamageFlag"
-    skill: "DamageFlag"
-    ult: "DamageFlag"
-    dot: "DamageFlag"
-    fua: "DamageFlag"
-    counter: "DamageFlag"
-    additional: "DamageFlag"
-    breaking: "DamageFlag"
-    super_break: "DamageFlag"
+    Basic: "DamageFlag"
+    Skill: "DamageFlag"
+    Ult: "DamageFlag"
+    DoT: "DamageFlag"
+    FUA: "DamageFlag"
+    Counter: "DamageFlag"
+    Additional: "DamageFlag"
+    Break: "DamageFlag"
+    SuperBreak: "DamageFlag"
+
+
+DamageFlag.Counter |= DamageFlag.FUA
+DamageFlag.SuperBreak |= DamageFlag.Break
 
 
 class Damage(Source):

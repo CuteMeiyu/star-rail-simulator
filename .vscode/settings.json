@@ -1,0 +1,13 @@
+{
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "always"
+    },
+    "python.analysis.typeCheckingMode": "standard",
+    "black-formatter.args": [
+        "-l 160"
+    ],
+    "isort.args": [
+        "-l 160"
+    ]
+}

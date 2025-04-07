@@ -1,27 +1,30 @@
 import random
-from typing import Iterable
+from typing import Any, Sequence
 from weakref import ref
 
 from .chain import Node
-from .combat import Mod, Team, Unit
+from .combat import Mod, Unit
 from .flexflag import FlexFlag
 from .source import Source
 
 
 class ActionFlag(FlexFlag):
-    attack: "ActionFlag"
-    impair: "ActionFlag"
-    support: "ActionFlag"
-    enhause: "ActionFlag"
-    heal: "ActionFlag"
+    Attack: "ActionFlag"
+    Single: "ActionFlag"
+    Blast: "ActionFlag"
+    AoE: "ActionFlag"
+    Bounce: "ActionFlag"
 
 
 class AttackFlag(FlexFlag):
-    basic: "AttackFlag"
-    skill: "AttackFlag"
-    ult: "AttackFlag"
-    follow_up: "AttackFlag"
-    counter: "AttackFlag"
+    Basic: "AttackFlag"
+    Skill: "AttackFlag"
+    Ult: "AttackFlag"
+    FUA: "AttackFlag"
+    Counter: "AttackFlag"
+
+
+AttackFlag.Counter |= AttackFlag.FUA
 
 
 class Action(Node, Source):
@@ -31,6 +34,7 @@ class Action(Node, Source):
         self.name = name
         self.action_flag = action_flag
         self.attack_flag = attack_flag
+        self.context: dict[str, Any] = {}
         self._main_target_ref = None
         self._targets_ref: list[ref[Unit]] = []
 
@@ -76,40 +80,30 @@ class Action(Node, Source):
     def add_target(self, target: Unit):
         self._targets_ref.append(ref(target))
 
+    def chain(self):
+        self.unit.team.battle.chain.add(self)
 
-class SingleAction(Action):
-    def __init__(self, name: str, unit: Unit, target: Unit, action_flag: ActionFlag, attack_flag: AttackFlag, priority=0) -> None:
+
+class TargetAction(Action):
+    def __init__(self, name: str, unit: Unit, target: Unit, action_flag: ActionFlag, attack_flag: AttackFlag, trans_target=False, priority=0) -> None:
         super().__init__(name, unit, action_flag, attack_flag, priority)
+        self.trans_target = trans_target
         self.main_target = target
         self.add_target(target)
 
     def condition(self):
-        return super().condition() and self.main_target is not None and self.main_target.selectable
+        if self.trans_target:
+            return super().condition()
+        else:
+            return super().condition() and self.main_target is not None and self.main_target.selectable
 
 
-class BlastAction(Action):
-    def __init__(self, name: str, unit: Unit, main_target: Unit, action_flag: ActionFlag, attack_flag: AttackFlag, priority=0) -> None:
-        super().__init__(name, unit, action_flag, attack_flag, priority)
-        self.main_target = main_target
-        for target in main_target.get_adjacent():
-            self.add_target(target)
-
-    def condition(self):
-        return super().condition() and self.main_target is not None and self.main_target.selectable
-
-
-class AoEAction(Action):
-    def __init__(self, name: str, unit: Unit, team: Team, action_flag: ActionFlag, attack_flag: AttackFlag, priority=0) -> None:
-        super().__init__(name, unit, action_flag, attack_flag, priority)
-        for target in team.get_units():
-            self.add_target(target)
-
-
-class BounceAction(Action):
+class BounceAction(TargetAction):
     def bounce(self, hp_above_0=True, targets: list[Unit] | None = None):
         assert self.main_target is not None
         if targets is None:
             targets = self.main_target.get_ally()
+        assert targets is not None
         available_targets: list[Unit] = []
         if hp_above_0:
             available_targets = [ally for ally in targets if ally.status.hp > 0]
@@ -122,17 +116,28 @@ class BounceAction(Action):
 
 
 class WeakAction(Action):
-    pass
+    def __init__(self, name: str, unit: Unit, priority=0) -> None:
+        super().__init__(name, unit, ActionFlag(), AttackFlag(), priority)
 
 
 class ActionProvider(Mod):
-    def get_available_actions(self) -> Iterable[Action]:
-        return ()
+    def __init__(self, source: Source | None, unit: Unit, over_turn: bool) -> None:
+        super().__init__(source, unit)
+        self.over_turn = over_turn
+
+    def get_available_actions(self) -> list[Action]:
+        return []
 
 
 class ActionSupressor(Mod):
-    def __init__(self, source: Source | None, unit: Unit) -> None:
-        super().__init__(source, unit)
-
     def check_available(self, action: Action):
         return True
+
+
+class ActionController(Mod):
+    def __init__(self, source: Source | None, unit: Unit, priority=0) -> None:
+        super().__init__(source, unit)
+        self.priority = priority
+
+    def choose_action(self, actions: list[Action]) -> Action | None:
+        return None
