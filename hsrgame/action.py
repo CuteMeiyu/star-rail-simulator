@@ -1,30 +1,38 @@
 import random
-from typing import Any, Sequence
+from dataclasses import dataclass
+from typing import Any
 from weakref import ref
 
 from .chain import Node
 from .combat import Mod, Unit
+from .event import Event, trigger
 from .flexflag import FlexFlag
 from .source import Source
 
 
 class ActionFlag(FlexFlag):
-    Attack: "ActionFlag"
-    Single: "ActionFlag"
-    Blast: "ActionFlag"
-    AoE: "ActionFlag"
-    Bounce: "ActionFlag"
+    attack: "ActionFlag"
+    single: "ActionFlag"
+    blast: "ActionFlag"
+    aoe: "ActionFlag"
+    bounce: "ActionFlag"
 
 
 class AttackFlag(FlexFlag):
-    Basic: "AttackFlag"
-    Skill: "AttackFlag"
-    Ult: "AttackFlag"
-    FUA: "AttackFlag"
-    Counter: "AttackFlag"
+    basic: "AttackFlag"
+    skill: "AttackFlag"
+    ult: "AttackFlag"
+    follow_up: "AttackFlag"
+    counter: "AttackFlag"
 
 
-AttackFlag.Counter |= AttackFlag.FUA
+AttackFlag.counter |= AttackFlag.follow_up
+
+
+@dataclass
+class EventAddTarget(Event):
+    action: "Action"
+    target: Unit
 
 
 class Action(Node, Source):
@@ -78,40 +86,27 @@ class Action(Node, Source):
         return True
 
     def add_target(self, target: Unit):
+        if target in self.targets:
+            return
         self._targets_ref.append(ref(target))
+        trigger(EventAddTarget(self, target))
 
     def chain(self):
         self.unit.team.battle.chain.add(self)
 
 
-class TargetAction(Action):
-    def __init__(self, name: str, unit: Unit, target: Unit, action_flag: ActionFlag, attack_flag: AttackFlag, trans_target=False, priority=0) -> None:
-        super().__init__(name, unit, action_flag, attack_flag, priority)
-        self.trans_target = trans_target
-        self.main_target = target
-        self.add_target(target)
-
-    def condition(self):
-        if self.trans_target:
-            return super().condition()
-        else:
-            return super().condition() and self.main_target is not None and self.main_target.selectable
-
-
-class BounceAction(TargetAction):
+class BounceAction(Action):
     def bounce(self, hp_above_0=True, targets: list[Unit] | None = None):
-        assert self.main_target is not None
         if targets is None:
+            assert self.main_target is not None
             targets = self.main_target.get_ally()
-        assert targets is not None
         available_targets: list[Unit] = []
         if hp_above_0:
             available_targets = [ally for ally in targets if ally.status.hp > 0]
         if len(available_targets) == 0:
             available_targets = targets
         target = random.choice(available_targets)
-        if target not in self.targets:
-            self.add_target(target)
+        self.add_target(target)
         return target
 
 

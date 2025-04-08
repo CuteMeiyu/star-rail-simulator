@@ -1,37 +1,29 @@
 import random
 
-import data.characters.qingque as data
-from character import EventUnitReady, Turn
-from hsrgame.action import Action, TargetAction, WeakAction
+from hsrgame.action import Action, ActionFlag, AttackFlag, WeakAction
 from hsrgame.buff import Buff, TickType
 from hsrgame.combat import EventTurn, Mod, Team, Unit
+from hsrgame.damage import Damage, DamageFlag, ToughnessDamage
 from hsrgame.event import listen
 from hsrgame.source import Source
 from hsrgame.stats import *
-from priority import Priority
+
+from ...character import Character, EventUnitReady, Turn
+from ...data.characters import qingque as data
+from ...priority import Priority
 
 
-class Qingque(Unit):
-    def __init__(self, stats: Stats, team: Team) -> None:
-        super().__init__("Qingque", "QQ", stats, team)
-        self.basic_level = 6
-        self.skill_level = 10
-        self.ult_level = 10
-        self.talent_level = 10
-        self.eidolon_flag = 0b111111  # E1 -> E6
-        Passive(self)
+class Qingque(Character):
+    def __init__(self, stats: Stats, team: Team, basic_level=6, skill_level=10, ult_level=10, talent_level=10, eidolon_level=0, trace_level=3) -> None:
+        super().__init__("Qingque", "QQ", stats, team, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_level)
+        Passive(self).add()
 
 
 class HiddenHand(Buff):
-    def __init__(self, source: Source | None, unit: Unit) -> None:
+    def __init__(self, source: Source | None, unit: Character) -> None:
         super().__init__(source, "Hidden Hand", unit, 1, TickType.end)
-        self.stats = Stats(ATK(increase=data.talent_atk_boost[self.qingque.talent_level - 1]))
+        self.stats = Stats(ATK(increase=data.talent_atk_boost[unit.talent_level - 1]))
         self.unit.stats += self.stats
-
-    @property
-    def qingque(self):
-        assert isinstance(self.unit, Qingque)
-        return self.unit
 
     def remove(self):
         self.unit.stats -= self.stats
@@ -40,11 +32,11 @@ class HiddenHand(Buff):
 
 class HiddenHandAnimation(WeakAction):
     def __init__(self, unit: Unit) -> None:
-        super().__init__("Hidden Hand", unit, 0)
+        super().__init__("Hidden Hand", unit)
 
 
 class Passive(Mod):
-    def __init__(self, unit: Unit) -> None:
+    def __init__(self, unit: Character) -> None:
         super().__init__(unit, unit)
         self.tiles = []
         self.pool = ["Wan", "Tong", "Tiao"]
@@ -57,17 +49,11 @@ class Passive(Mod):
         self.on_unit_ready_listener.remove()
         return super().remove()
 
-    @property
-    def qingque(self):
-        assert isinstance(self.unit, Qingque)
-        return self.unit
-
     def is_win(self):
         return len(self.tiles) > 0 and self.tiles.count(self.tiles[0]) == 4
 
     def draw(self, n=1, pool: list[str] | None = None):
-        if self.qingque.eidolon_flag & 0b010000 > 0:
-            self.qingque.gain_energy(1, True)
+        assert isinstance(self.unit, Character)
         if pool is None:
             pool = self.pool
         if not self.is_win():
@@ -77,7 +63,15 @@ class Passive(Mod):
             self.tiles.sort(key=lambda x: (-self.tiles.count(x), self.tiles.index(x)))
             self.tiles = self.tiles[:4]
         if self.is_win():
-            HiddenHand(self, self.unit)
+            HiddenHand(self, self.unit).add()
+
+    def pop(self):
+        if len(self.tiles) == 0:
+            return None
+        return self.tiles.pop()
+
+    def clear(self):
+        self.tiles.clear()
 
     def on_turn_start(self, event: EventTurn):
         if event.unit.team is not self.unit.team:
@@ -95,3 +89,20 @@ class Passive(Mod):
             return
         self.performed = True
         HiddenHandAnimation(self.unit).chain()
+
+
+class Basic(Action):
+    def __init__(self, unit: Character, target: Unit) -> None:
+        super().__init__("Flower Pick", unit, ActionFlag.attack | ActionFlag.single, AttackFlag.basic)
+        self.main_target = target
+        self.scale = data.basic_scale[unit.basic_level - 1]
+
+    def run(self):
+        assert self.main_target is not None
+        self.unit.team.change_skill_point(self, 1)
+        passive = self.unit.get_mod(Passive)
+        if passive is not None:
+            passive.pop()
+        self.add_target(self.main_target)
+        self.unit.regenerate_energy(20, False)
+        Damage(self, self.unit, self.main_target, self.scale, DamageFlag.basic, CombatTypes.quantum).deal()

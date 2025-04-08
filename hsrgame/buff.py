@@ -8,9 +8,9 @@ from .source import Source
 
 
 class BuffFlag(FlexFlag):
-    Undispelable: "BuffFlag"
-    Neutral: "BuffFlag"
-    Control: "BuffFlag"
+    undispelable: "BuffFlag"
+    neutral: "BuffFlag"
+    control: "BuffFlag"
 
 
 class TickType(IntEnum):
@@ -42,14 +42,7 @@ class EventBuffDispel(Event):
 
 
 class Buff(Mod):
-    def __init__(
-        self,
-        source: Source | None,
-        name: str,
-        unit: Unit,
-        duration: int,
-        tick_type: TickType,
-    ) -> None:
+    def __init__(self, source: Source | None, name: str, unit: Unit, duration: int, tick_type: TickType) -> None:
         super().__init__(source, unit)
         self.name = name
         self.tick_type = tick_type

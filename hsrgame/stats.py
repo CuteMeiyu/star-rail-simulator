@@ -78,6 +78,10 @@ class Break_Effect(_SimpleStat):
     pass
 
 
+class Break_Efficiency(_SimpleStat):
+    pass
+
+
 class CRIT_Rate(_SimpleStat):
     pass
 
@@ -123,19 +127,19 @@ class Weaken(_SimpleStat):
 
 
 class Debuffs(_StrEnum):
-    Bleed = "Bleed"
-    Burn = "Burn"
-    Shock = "Shock"
-    WindShear = "Wind Shear"
-    Frozen = "Frozen"
-    Entanglement = "Entanglement"
-    Imprisonment = "Imprisonment"
-    Control = "Control"
-    Debuff = "Debuff"
+    bleed = "Bleed"
+    burn = "Burn"
+    shock = "Shock"
+    wind_shear = "Wind Shear"
+    frozen = "Frozen"
+    entanglement = "Entanglement"
+    imprisonment = "Imprisonment"
+    control = "Control"
+    debuff = "Debuff"
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, debuff_name: Debuffs = Debuffs.Debuff) -> None:
+    def __init__(self, value=0.0, debuff_name: Debuffs = Debuffs.debuff) -> None:
         self.debuff_name = debuff_name
         self.multipiers: dict[str, float] = {debuff_name: 1 - value}
 
@@ -147,7 +151,7 @@ class Effect_RES(Stat[float]):
                 self.multipiers[debuff_name] = value
         return self
 
-    def get_multipier(self, debuff_name: Debuffs = Debuffs.Debuff):
+    def get_multipier(self, debuff_name: Debuffs = Debuffs.debuff):
         return 1 - self.multipiers[debuff_name]
 
     def get_value(self) -> float:
@@ -181,24 +185,25 @@ class _GroupStat(Stat[tuple[_T, ...]], _Generic[_T]):
 
 
 class CombatTypes(_StrEnum):
-    Physical = "Physical"
-    Fire = "Fire"
-    Lightning = "Lightning"
-    Wind = "Wind"
-    Ice = "Ice"
-    Quantum = "Quantum"
-    Imaginary = "Imaginary"
+    physical = "Physical"
+    fire = "Fire"
+    lightning = "Lightning"
+    wind = "Wind"
+    ice = "Ice"
+    quantum = "Quantum"
+    imaginary = "Imaginary"
+    none = "None"
 
 
 class Paths(_StrEnum):
-    Destruction = "Destruction"
-    Preservation = "Preservation"
-    Hunt = "Hunt"
-    Erudition = "Erudition"
-    Nihility = "Nihility"
-    Harmony = "Harmony"
-    Abundance = "Abundance"
-    Remembrance = "Remembrance"
+    destruction = "Destruction"
+    preservation = "Preservation"
+    hunt = "The Hunt"
+    erudition = "Erudition"
+    nihility = "Nihility"
+    harmony = "Harmony"
+    abundance = "Abundance"
+    remembrance = "Remembrance"
 
 
 class Weakness(_GroupStat[CombatTypes]):

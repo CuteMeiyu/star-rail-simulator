@@ -1,6 +1,3 @@
-from hsrgame.stats import CRIT_DMG, CRIT_Rate, Level, Stats
-
-
 def generate_lv10_data(start: float, step: float):
     return [i * step + start for i in range(10)]
 

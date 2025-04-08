@@ -14,13 +14,15 @@ class Mod(Source):
     def __init__(self, source: Source | None, unit: "Unit") -> None:
         super().__init__(source)
         self._unit_ref = ref(unit)
-        unit.mods.append(self)
 
     @property
     def unit(self):
         unit = self._unit_ref()
         assert unit is not None
         return unit
+
+    def add(self):
+        self.unit.mods.append(self)
 
     def remove(self):
         self.unit.mods.remove(self)
@@ -70,6 +72,7 @@ class ReviveNode(Node, Source):
 class Status:
     hp: float
     energy: float
+    toughness: float
     alive: bool
 
 
@@ -82,6 +85,7 @@ class Unit(Runner, Source):
         self.status = Status(
             hp=self.stats.get(HP),
             energy=self.stats.get(Energy),
+            toughness=self.stats.get(Toughness),
             alive=True,
         )
         self.team = team
@@ -117,11 +121,18 @@ class Unit(Runner, Source):
     def get_ally(self):
         return self.team.get_units()
 
-    def gain_energy(self, amount: float, fixed: bool):
+    def regenerate_energy(self, amount: float, fixed: bool):
         if not fixed:
             amount *= 1.0 + self.stats.get(Energy_Regeneration_Rate)
         self.status.energy += amount
         self.status.energy = min(self.status.energy, self.stats.get(Energy))
+
+
+@dataclass
+class EventChangeSkillPoint(Event):
+    source: Source | None
+    team: "Team"
+    amount: int
 
 
 class Team:
@@ -167,6 +178,11 @@ class Team:
             if unit.selectable:
                 targets.append(unit)
         return targets
+
+    def change_skill_point(self, source: Source | None, amount: int):
+        trigger(EventChangeSkillPoint(source, self, amount))
+        self.skill_point += amount
+        self.skill_point = min(self.skill_point, self.max_skill_point)
 
 
 @dataclass

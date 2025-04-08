@@ -1,5 +1,6 @@
-from data.characters.utils import generate_lv10_data, generate_lv15_data
 from hsrgame.stats import *
+
+from ...utils import generate_lv10_data, generate_lv15_data
 
 base_stats = Stats(
     HP(base=1023.1),
@@ -11,8 +12,8 @@ base_stats = Stats(
     Level(80),
     CRIT_Rate(0.05),
     CRIT_DMG(0.5),
-    Path(Paths.Erudition),
-    CombatType(CombatTypes.Quantum),
+    Path(Paths.erudition),
+    CombatType(CombatTypes.quantum),
 )
 
 basic_scale = generate_lv10_data(0.5, 0.1)

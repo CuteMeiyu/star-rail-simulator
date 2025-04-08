@@ -1,6 +1,10 @@
+import math
 import random
 from dataclasses import dataclass
-from typing import Any
+from typing import Generic, TypeVar
+from weakref import ref
+
+from hsrgame.stats import Stats
 
 from .combat import Unit
 from .event import Event, trigger
@@ -15,90 +19,190 @@ def clamp(value: float, lower_bound: float, upper_bound: float):
 
 @dataclass
 class EventDamage(Event):
-    damage: "Damage"
+    damage: "DamageBase"
 
 
 class DamageFlag(FlexFlag):
-    Basic: "DamageFlag"
-    Skill: "DamageFlag"
-    Ult: "DamageFlag"
-    DoT: "DamageFlag"
-    FUA: "DamageFlag"
-    Counter: "DamageFlag"
-    Additional: "DamageFlag"
-    Break: "DamageFlag"
-    SuperBreak: "DamageFlag"
+    basic: "DamageFlag"
+    skill: "DamageFlag"
+    ult: "DamageFlag"
+    dot: "DamageFlag"
+    follow_up: "DamageFlag"
+    counter: "DamageFlag"
+    additional: "DamageFlag"
+    breaking: "DamageFlag"
+    super_break: "DamageFlag"
 
 
-DamageFlag.Counter |= DamageFlag.FUA
-DamageFlag.SuperBreak |= DamageFlag.Break
+DamageFlag.counter |= DamageFlag.follow_up
+DamageFlag.super_break |= DamageFlag.breaking
 
 
-class Damage(Source):
-    def __init__(self, source: Source | None, unit: Unit, target: Unit, scale: float, flag: DamageFlag, stat_type: type[Stat[Any]] = ATK) -> None:
+_T_Damage = TypeVar("_T_Damage", bound="DamageBase")
+
+
+class Multipier(Generic[_T_Damage]):
+    def __init__(self, damage: _T_Damage):
+        self._damage_ref = ref(damage)
+
+    @property
+    def damage(self):
+        damage = self._damage_ref()
+        assert damage is not None
+        return damage
+
+    def get(self) -> float:
+        return 0.0
+
+
+_T_Multipier = TypeVar("_T_Multipier", bound=Multipier)
+
+
+class CritMultipier(Multipier):
+    def __init__(self, damage: "DamageBase"):
+        super().__init__(damage)
+        self.rng = random.random()
+
+    def is_crit(self):
+        return self.rng < self.damage.source_stats.get(CRIT_Rate)
+
+    def get(self):
+        return 1.0 + self.damage.source_stats.get(CRIT_DMG) if self.is_crit() else 1.0
+
+
+class DamageBoostMultipier(Multipier):
+    def get(self):
+        return 1.0 + self.damage.source_stats.get(DMG_Boost)
+
+
+class WeakenMultipier(Multipier):
+    def get(self):
+        return clamp(1.0 - self.damage.source_stats.get(Weaken), 0.0, 1.0)
+
+
+class DefenseMultipier(Multipier):
+    def get(self):
+        with self.damage.target_stats.temp(Stats(DEF(decrease=self.damage.source_stats.get(DEF_Ignore)))):
+            return (self.damage.source_stats.get(Level) * 10.0 + 200.0) / (
+                self.damage.source_stats.get(Level) * 10.0 + 200.0 + max(0.0, self.damage.target_stats.get(DEF))
+            )
+
+
+class ResistanceMultipier(Multipier):
+    def get(self):
+        return clamp(1.0 - self.damage.target_stats.get(DMG_RES) + self.damage.source_stats.get(RES_PEN), 0.0, 2.0)
+
+
+class VulnerabilityMultipier(Multipier):
+    def get(self):
+        return 1.0 + self.damage.target_stats.get(Vulnerability)
+
+
+class DMGMitigationMultipier(Multipier):
+    def get(self):
+        return max(1.0 - self.damage.target_stats.get(DMG_Mitigation), 0.0)
+
+
+class BrokenMultipier(Multipier):
+    def get(self):
+        return 1.0 if self.damage.target.status.toughness <= 0.0 else 0.9
+
+
+class DamageBase(Source):
+    def __init__(self, source: Source | None, unit: Unit, target: Unit) -> None:
         super().__init__(source)
         self.unit = unit
         self.target = target
-        self.scale = scale
-        self.flag = flag
-        self.stat_type = stat_type
-        self.rng = random.random()
         self.source_stats = Stats()
         self.target_stats = Stats()
         self.source_stats += self.unit.stats
         self.target_stats += self.target.stats
+        self.multipiers: list[Multipier] = []
 
-    def is_crit(self):
-        return self.rng < self.source_stats.get(CRIT_Rate)
+    def get_multipier(self, multipier_cls: type[_T_Multipier]) -> _T_Multipier | None:
+        for multipier in self.multipiers:
+            if isinstance(multipier, multipier_cls):
+                return multipier
+        return None
 
-    def get_base_damage(self) -> float:
-        return self.scale * self.source_stats.get(self.stat_type)
+    def add_multipier(self, multipier: Multipier):
+        assert self.get_multipier(type(multipier)) is None
+        self.multipiers.append(multipier)
 
-    def get_crit_damage_multipier(self):
-        return 1.0 + self.source_stats.get(CRIT_DMG) if self.is_crit() else 1.0
+    def add_multipiers(self, *multipiers: Multipier):
+        for multipier in multipiers:
+            self.add_multipier(multipier)
 
-    def get_damage_boost_multipier(self):
-        return 1.0 + self.source_stats.get(DMG_Boost)
+    def remove_multipier(self, multipier: Multipier):
+        self.multipiers.remove(multipier)
 
-    def get_weaken_multipier(self):
-        return clamp(1.0 - self.source_stats.get(Weaken), 0.0, 1.0)
-
-    def get_defense_multipier(self):
-        with self.target_stats.temp(Stats(DEF(decrease=self.source_stats.get(DEF_Ignore)))):
-            return (self.source_stats.get(Level) * 10.0 + 200.0) / (self.source_stats.get(Level) * 10.0 + 200.0 + max(0.0, self.target_stats.get(DEF)))
-
-    def get_resistance_multipier(self):
-        return clamp(1.0 - self.target_stats.get(DMG_RES) + self.source_stats.get(RES_PEN), 0.0, 2.0)
-
-    def get_vulnerability_multipier(self):
-        return 1.0 + self.target_stats.get(Vulnerability)
-
-    def get_damage_mitigation_multipier(self):
-        return max(1.0 - self.target_stats.get(DMG_Mitigation), 0.0)
-
-    # def get_broken_multipier(self):
-    #     return 1.0 if self.target.status.toughness <= 0.0 else 0.9
+    def update_multipier(self, multipier: Multipier):
+        old_multipier = self.get_multipier(type(multipier))
+        assert old_multipier is not None
+        self.remove_multipier(old_multipier)
+        self.add_multipier(multipier)
 
     def calc(self):
-        return (
-            self.get_base_damage()
-            * self.get_crit_damage_multipier()
-            * self.get_damage_boost_multipier()
-            * self.get_weaken_multipier()
-            * self.get_defense_multipier()
-            * self.get_resistance_multipier()
-            * self.get_vulnerability_multipier()
-            * self.get_damage_mitigation_multipier()
-            # * self.get_broken_multipier()
-        )
+        return math.prod(multipier.get() for multipier in self.multipiers)
 
     def deal(self):
-        trigger(EventDamage(self))
-        amount = self.calc()
+        pass
 
-        # for shield in self.target.get_mods(Shield):
-        #     amount = shield.cost_hp(self, amount)
-        #     if amount <= 0.0:
-        #         break
-        # if amount > 0.0:
-        #     self.target.cost_hp(self, amount)
+
+class BaseDamageMultipier(Multipier["Damage"]):
+    def get(self):
+        return self.damage.scale * self.damage.source_stats.get(self.damage.stat_type)
+
+
+class Damage(DamageBase):
+    def __init__(
+        self,
+        source: Source | None,
+        unit: Unit,
+        target: Unit,
+        scale: float,
+        flag: DamageFlag,
+        combat_type: CombatTypes,
+        stat_type: type[Stat[float]] = ATK,
+    ) -> None:
+        super().__init__(source, unit, target)
+        self.scale = scale
+        self.flag = flag
+        self.combat_type = combat_type
+        self.stat_type = stat_type
+        self.add_multipiers(
+            BaseDamageMultipier(self),
+            CritMultipier(self),
+            DamageBoostMultipier(self),
+            WeakenMultipier(self),
+            DefenseMultipier(self),
+            ResistanceMultipier(self),
+            VulnerabilityMultipier(self),
+            DMGMitigationMultipier(self),
+            BrokenMultipier(self),
+        )
+
+
+@dataclass
+class EventToughnessDamage(Event):
+    damage: "ToughnessDamage"
+
+
+class BaseToughnessDamageMultipier(Multipier["ToughnessDamage"]):
+    def get(self):
+        return self.damage.base_amount
+
+
+class BreakEfficiencyMultipier(Multipier):
+    def get(self):
+        return 1.0 + self.damage.source_stats.get(Break_Efficiency)
+
+
+class ToughnessDamage(DamageBase):
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, amount: float) -> None:
+        super().__init__(source, unit, target)
+        self.base_amount = amount
+        self.add_multipiers(
+            BaseToughnessDamageMultipier(self),
+            BreakEfficiencyMultipier(self),
+        )
