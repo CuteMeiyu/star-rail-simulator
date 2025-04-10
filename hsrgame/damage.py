@@ -146,7 +146,7 @@ class DamageBase(Source):
         return math.prod(multipier.get() for multipier in self.multipiers)
 
     def deal(self):
-        pass
+        trigger(EventDamage(self))
 
 
 class BaseDamageMultipier(Multipier["Damage"]):
@@ -162,7 +162,7 @@ class Damage(DamageBase):
         target: Unit,
         scale: float,
         flag: DamageFlag,
-        combat_type: CombatTypes,
+        combat_type: CombatType,
         stat_type: type[Stat[float]] = ATK,
     ) -> None:
         super().__init__(source, unit, target)
@@ -183,11 +183,6 @@ class Damage(DamageBase):
         )
 
 
-@dataclass
-class EventToughnessDamage(Event):
-    damage: "ToughnessDamage"
-
-
 class BaseToughnessDamageMultipier(Multipier["ToughnessDamage"]):
     def get(self):
         return self.damage.base_amount
@@ -198,11 +193,23 @@ class BreakEfficiencyMultipier(Multipier):
         return 1.0 + self.damage.source_stats.get(Break_Efficiency)
 
 
+class WeaknessMultipier(Multipier["ToughnessDamage"]):
+    def get(self):
+        if self.damage.target_stats.get(WeaknessProtect) > 0:
+            return 0.0
+        if self.damage.combat_type in self.damage.target_stats.get(Weakness):
+            return 1.0
+        return min(self.damage.source_stats.get(WeaknessIgnore), 1.0)
+
+
 class ToughnessDamage(DamageBase):
-    def __init__(self, source: Source | None, unit: Unit, target: Unit, amount: float) -> None:
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, amount: float, combat_type: CombatType, update_broken_status=False) -> None:
         super().__init__(source, unit, target)
         self.base_amount = amount
+        self.combat_type = combat_type
+        self.update_broken_status = update_broken_status
         self.add_multipiers(
             BaseToughnessDamageMultipier(self),
             BreakEfficiencyMultipier(self),
+            WeaknessMultipier(self),
         )

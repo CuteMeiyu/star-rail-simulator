@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any, Self, overload
 
 
 class MetaFlexFlag(type):
@@ -25,21 +25,77 @@ class FlexFlag(metaclass=MetaFlexFlag):
     def __init__(self, value=0) -> None:
         self.value = value
 
-    def __contains__(self, other: Self) -> bool:
+    def __eq__(self, other: object):
+        assert isinstance(other, type(self))
+        return self.value == other.value
+
+    def __contains__(self, other: Self):
         return other.value & self.value == other.value
 
     def __str__(self):
         return str(self.value)
 
-    def __or__(self, other: Self) -> Self:
-        return type(self)(self.value | other.value)
+    @overload
+    def __or__(self, other: Self) -> Self: ...  # type: ignore
 
-    def __ior__(self, other: Self) -> Self:
+    @overload
+    def __or__(self, other: "FlexFlag") -> "MixFlag": ...
+
+    def __or__(self, other: "Self | FlexFlag | MixFlag") -> "Self | MixFlag":
+        if type(self) is type(other):
+            assert isinstance(other, FlexFlag)
+            return type(self)(self.value | other.value)
+        return MixFlag(self, other)
+
+    def __ior__(self, other: Self):
         self.value |= other.value
         return self
+
+    def __invert__(self) -> Self:
+        return type(self)(~self.value)
 
     @classmethod
     def auto(cls):
         flag = cls(1 << cls._shift)
         cls._shift += 1
         return flag
+
+
+class MixFlag:
+    def __init__(self, *flags: FlexFlag | Self) -> None:
+        self.flag_dict: dict[type[FlexFlag], FlexFlag] = {}
+        for flag in flags:
+            self |= flag
+
+    def __ior__(self, other: FlexFlag | Self):
+        if isinstance(other, FlexFlag):
+            if type(other) in self.flag_dict:
+                self.flag_dict[type(other)] |= other
+            else:
+                self.flag_dict[type(other)] = other
+        else:
+            for flag_type, flag in other.flag_dict.items():
+                if flag_type in self.flag_dict:
+                    self.flag_dict[flag_type] |= flag
+                else:
+                    self.flag_dict[flag_type] = flag
+        return self
+
+    def __eq__(self, other: object):
+        assert isinstance(other, MixFlag)
+        for flag_type, flag in self.flag_dict.items():
+            if flag_type not in self.flag_dict:
+                return False
+            if flag != self.flag_dict[flag_type]:
+                return False
+        return True
+
+    def __contains__(self, other: FlexFlag | Self):
+        if isinstance(other, FlexFlag):
+            return type(other) in self.flag_dict and other in self.flag_dict[type(other)]
+        for flag_type, flag in other.flag_dict.items():
+            if flag_type not in self.flag_dict:
+                return False
+            if flag not in self.flag_dict[flag_type]:
+                return False
+        return True

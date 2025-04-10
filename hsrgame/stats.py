@@ -4,26 +4,47 @@ from copy import deepcopy as _deepcopy
 from enum import StrEnum as _StrEnum
 from typing import Any as _Any
 from typing import Generic as _Generic
-from typing import Literal as _Literal
 from typing import Self as _Self
 from typing import TypeVar as _TypeVar
+
+from .flexflag import FlexFlag as _FlexFlag
+from .flexflag import MixFlag as _MixFlag
 
 _T = _TypeVar("_T")
 
 
+class ElementFlag(_FlexFlag):
+    physical: "ElementFlag"
+    fire: "ElementFlag"
+    lightning: "ElementFlag"
+    wind: "ElementFlag"
+    ice: "ElementFlag"
+    quantum: "ElementFlag"
+    imaginary: "ElementFlag"
+
+
 class Stat(_Generic[_T]):
+    def __init__(self, flag: _FlexFlag | _MixFlag | None = None) -> None:
+        if flag is None:
+            self.flag = _MixFlag()
+        else:
+            self.flag = _MixFlag(flag)
+
     def __iadd__(self, other: _Self) -> _Self: ...
     def get_value(self) -> _T: ...
 
 
 class _ComplexStat(Stat[float]):
-    def __init__(self, base=0.0, flat=0.0, increase=0.0, decrease=0.0) -> None:
+    def __init__(self, base=0.0, flat=0.0, increase=0.0, decrease=0.0, flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.base = base
         self.flat = flat
         self.increase = increase
         self.decrease = decrease
+        super().__init__(flag)
 
     def __iadd__(self, other: _Self) -> _Self:
+        if other.flag not in self.flag:
+            return self
         self.base += other.base
         self.flat += other.flat
         self.increase += other.increase
@@ -63,10 +84,13 @@ class Toughness(_ComplexStat):
 
 
 class _SimpleStat(Stat[float]):
-    def __init__(self, value=0.0) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.value = value
+        super().__init__(flag)
 
     def __iadd__(self, other: _Self) -> _Self:
+        if other.flag not in self.flag:
+            return self
         self.value += other.value
         return self
 
@@ -126,38 +150,53 @@ class Weaken(_SimpleStat):
     pass
 
 
-class Debuffs(_StrEnum):
-    bleed = "Bleed"
-    burn = "Burn"
-    shock = "Shock"
-    wind_shear = "Wind Shear"
-    frozen = "Frozen"
-    entanglement = "Entanglement"
-    imprisonment = "Imprisonment"
-    control = "Control"
-    debuff = "Debuff"
+class WeaknessIgnore(_SimpleStat):
+    pass
+
+
+class DebuffFlag(_FlexFlag):
+    bleed: "DebuffFlag"
+    burn: "DebuffFlag"
+    shock: "DebuffFlag"
+    wind_shear: "DebuffFlag"
+    frozen: "DebuffFlag"
+    entanglement: "DebuffFlag"
+    imprisonment: "DebuffFlag"
+    control: "DebuffFlag"
+    dot: "DebuffFlag"
+
+
+DebuffFlag.frozen |= DebuffFlag.control
+DebuffFlag.entanglement |= DebuffFlag.control
+DebuffFlag.imprisonment |= DebuffFlag.control
+DebuffFlag.bleed |= DebuffFlag.dot
+DebuffFlag.burn |= DebuffFlag.dot
+DebuffFlag.shock |= DebuffFlag.dot
+DebuffFlag.wind_shear |= DebuffFlag.dot
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, debuff_name: Debuffs = Debuffs.debuff) -> None:
-        self.debuff_name = debuff_name
-        self.multipiers: dict[str, float] = {debuff_name: 1 - value}
+    def __init__(self, value=0.0, flag: DebuffFlag | None = None) -> None:
+        self.value = value
+        self.multipiers: dict[int, float] = {}
+        if flag is None:
+            self.buff_flag = DebuffFlag()
+        else:
+            self.buff_flag = flag
+        super().__init__(None)
 
     def __iadd__(self, other: _Self) -> _Self:
-        for debuff_name, value in other.multipiers.items():
-            if debuff_name in self.multipiers:
-                self.multipiers[debuff_name] += value - 1
+        if self.buff_flag == other.buff_flag:
+            self.value += other.value
+        elif other.buff_flag in self.buff_flag:
+            if other.buff_flag.value in self.multipiers:
+                self.multipiers[other.buff_flag.value] += other.value
             else:
-                self.multipiers[debuff_name] = value
+                self.multipiers[other.buff_flag.value] = other.value
         return self
 
-    def get_multipier(self, debuff_name: Debuffs = Debuffs.debuff):
-        return 1 - self.multipiers[debuff_name]
-
     def get_value(self) -> float:
-        if any(value < 0 for value in self.multipiers.values()):
-            return 1.0
-        return 1 - _math.prod(self.multipiers.values())
+        return self.value * (1.0 - _math.prod(1.0 - min(value, 1.0) for value in self.multipiers.values()))
 
 
 class DMG_Mitigation(Stat[float]):
@@ -184,7 +223,7 @@ class _GroupStat(Stat[tuple[_T, ...]], _Generic[_T]):
         return tuple(self.value)
 
 
-class CombatTypes(_StrEnum):
+class CombatType(_StrEnum):
     physical = "Physical"
     fire = "Fire"
     lightning = "Lightning"
@@ -195,7 +234,7 @@ class CombatTypes(_StrEnum):
     none = "None"
 
 
-class Paths(_StrEnum):
+class Path(_StrEnum):
     destruction = "Destruction"
     preservation = "Preservation"
     hunt = "The Hunt"
@@ -206,15 +245,15 @@ class Paths(_StrEnum):
     remembrance = "Remembrance"
 
 
-class Weakness(_GroupStat[CombatTypes]):
+class Weakness(_GroupStat[CombatType]):
     pass
 
 
-class Path(_GroupStat[Paths]):
+class Paths(_GroupStat[Path]):
     pass
 
 
-class CombatType(_GroupStat[CombatTypes]):
+class CombatTypes(_GroupStat[CombatType]):
     pass
 
 
@@ -234,7 +273,7 @@ class Level(_IntStat):
     pass
 
 
-class WeaknessDisable(_IntStat):
+class WeaknessProtect(_IntStat):
     pass
 
 

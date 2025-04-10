@@ -12,8 +12,8 @@ base_stats = Stats(
     Level(80),
     CRIT_Rate(0.05),
     CRIT_DMG(0.5),
-    Path(Paths.erudition),
-    CombatType(CombatTypes.quantum),
+    Paths(Path.erudition),
+    CombatTypes(CombatType.quantum),
 )
 
 basic_scale = generate_lv10_data(0.5, 0.1)

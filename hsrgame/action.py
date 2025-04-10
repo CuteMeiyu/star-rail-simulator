@@ -16,17 +16,14 @@ class ActionFlag(FlexFlag):
     blast: "ActionFlag"
     aoe: "ActionFlag"
     bounce: "ActionFlag"
+    basic: "ActionFlag"
+    skill: "ActionFlag"
+    ult: "ActionFlag"
+    follow_up: "ActionFlag"
+    counter: "ActionFlag"
 
 
-class AttackFlag(FlexFlag):
-    basic: "AttackFlag"
-    skill: "AttackFlag"
-    ult: "AttackFlag"
-    follow_up: "AttackFlag"
-    counter: "AttackFlag"
-
-
-AttackFlag.counter |= AttackFlag.follow_up
+ActionFlag.counter |= ActionFlag.follow_up
 
 
 @dataclass
@@ -36,12 +33,11 @@ class EventAddTarget(Event):
 
 
 class Action(Node, Source):
-    def __init__(self, name: str, unit: Unit, action_flag: ActionFlag, attack_flag: AttackFlag, priority=0) -> None:
+    def __init__(self, name: str, unit: Unit, flag: ActionFlag, priority=0) -> None:
         super().__init__(priority)
         Source.__init__(self, unit)
         self.name = name
-        self.action_flag = action_flag
-        self.attack_flag = attack_flag
+        self.flag = flag
         self.context: dict[str, Any] = {}
         self._main_target_ref = None
         self._targets_ref: list[ref[Unit]] = []
@@ -112,7 +108,7 @@ class BounceAction(Action):
 
 class WeakAction(Action):
     def __init__(self, name: str, unit: Unit, priority=0) -> None:
-        super().__init__(name, unit, ActionFlag(), AttackFlag(), priority)
+        super().__init__(name, unit, ActionFlag(), priority)
 
 
 class ActionProvider(Mod):
@@ -131,8 +127,7 @@ class ActionSupressor(Mod):
 
 class ActionController(Mod):
     def __init__(self, source: Source | None, unit: Unit, priority=0) -> None:
-        super().__init__(source, unit)
-        self.priority = priority
+        super().__init__(source, unit, priority)
 
     def choose_action(self, actions: list[Action]) -> Action | None:
         return None

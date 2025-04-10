@@ -3,14 +3,8 @@ from enum import IntEnum, auto
 
 from .combat import EventTurn, EventTurnEnd, Mod, Unit
 from .event import Event, listen, trigger
-from .flexflag import FlexFlag
 from .source import Source
-
-
-class BuffFlag(FlexFlag):
-    undispelable: "BuffFlag"
-    neutral: "BuffFlag"
-    control: "BuffFlag"
+from .stats import *
 
 
 class TickType(IntEnum):
@@ -42,15 +36,30 @@ class EventBuffDispel(Event):
 
 
 class Buff(Mod):
-    def __init__(self, source: Source | None, name: str, unit: Unit, duration: int, tick_type: TickType) -> None:
-        super().__init__(source, unit)
+    def __init__(
+        self, source: Source | None, name: str, unit: Unit, duration: int, flag: DebuffFlag, tick_type: TickType, dispelable=True, max_stack=0, priority=0
+    ) -> None:
+        super().__init__(source, unit, priority)
         self.name = name
         self.tick_type = tick_type
         self.started = False
         self.duration = duration
+        self.flag = flag
+        self.max_stack = max_stack
+        self.stacks = 0
+        self.dispelable = dispelable
+
+    def add(self):
         self.on_turn_start_listener = listen(EventTurn, self.on_turn_start)
         self.on_turn_end_listener = listen(EventTurnEnd, self.on_turn_end)
+        super().add()
         trigger(EventBuffAdd(self))
+
+    def remove(self):
+        self.on_turn_start_listener.remove()
+        self.on_turn_end_listener.remove()
+        super().remove()
+        trigger(EventBuffRemove(self))
 
     def on_turn_start(self, event: EventTurn):
         if event.unit is not self.unit:
@@ -76,11 +85,12 @@ class Buff(Mod):
             trigger(EventBuffExpired(self))
             self.remove()
 
-    def remove(self):
-        self.on_turn_start_listener.remove()
-        self.on_turn_end_listener.remove()
-        super().remove()
-        trigger(EventBuffRemove(self))
-
     def dispel(self, source: Source | None):
+        if not self.dispelable:
+            return
         trigger(EventBuffDispel(self, source))
+        self.remove()
+
+    def stack(self, amount=1):
+        self.stacks += amount
+        self.stacks = min(self.stacks, self.max_stack)

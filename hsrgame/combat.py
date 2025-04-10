@@ -1,3 +1,4 @@
+from bisect import insort_right
 from dataclasses import dataclass
 from enum import IntEnum, auto
 from typing import Any, TypeVar
@@ -11,9 +12,10 @@ from .stats import *
 
 
 class Mod(Source):
-    def __init__(self, source: Source | None, unit: "Unit") -> None:
+    def __init__(self, source: Source | None, unit: "Unit", priority=0) -> None:
         super().__init__(source)
         self._unit_ref = ref(unit)
+        self.priority = priority
 
     @property
     def unit(self):
@@ -22,7 +24,7 @@ class Mod(Source):
         return unit
 
     def add(self):
-        self.unit.mods.append(self)
+        insort_right(self.unit.mods, self, key=lambda mod: mod.priority)
 
     def remove(self):
         self.unit.mods.remove(self)
@@ -68,6 +70,17 @@ class ReviveNode(Node, Source):
         trigger(EventRevive(self.unit, self.source))
 
 
+class DeathProtect(Mod):
+    def __init__(self, source: Source | None, unit: "Unit", count=1, priority=0) -> None:
+        super().__init__(source, unit, priority)
+        self.count = count
+
+    def protect(self):
+        self.count -= 1
+        if self.count <= 0:
+            self.remove()
+
+
 @dataclass
 class Status:
     hp: float
@@ -90,7 +103,6 @@ class Unit(Runner, Source):
         )
         self.team = team
         self.mods: list[Mod] = []
-        team.add_unit(self)
 
     @property
     def selectable(self):
@@ -112,6 +124,9 @@ class Unit(Runner, Source):
                 mods.append(mod)
         return mods
 
+    def add(self):
+        self.team.add_unit(self)
+
     def remove(self):
         self.team.remove_unit(self)
 
@@ -121,11 +136,25 @@ class Unit(Runner, Source):
     def get_ally(self):
         return self.team.get_units()
 
-    def regenerate_energy(self, amount: float, fixed: bool):
+    def cost_energy(self, source: Source | None, amount: float):
+        self.status.energy -= amount
+        self.status.energy = max(self.status.energy, 0.0)
+
+    def regenerate_energy(self, source: Source | None, amount: float, fixed: bool):
         if not fixed:
             amount *= 1.0 + self.stats.get(Energy_Regeneration_Rate)
         self.status.energy += amount
         self.status.energy = min(self.status.energy, self.stats.get(Energy))
+
+    def cost_hp(self, source: Source | None, amount: float):
+        self.status.hp -= amount
+        self.status.hp = max(self.status.hp, 0.0)
+        if self.status.hp <= 0.0:
+            protect = self.get_mod(DeathProtect)
+            if protect is not None:
+                protect.protect()
+            else:
+                self.team.battle.chain.add(Death(self))
 
 
 @dataclass
@@ -141,7 +170,12 @@ class Team:
         self.battle = battle
         self.max_skill_point = 5
         self.skill_point = 3
-        battle.add_team(self)
+
+    def add(self):
+        self.battle.add_team(self)
+
+    def remove(self):
+        self.battle.remove_team(self)
 
     def lost(self):
         return all(not unit.status.alive for unit in self.units)
@@ -195,6 +229,11 @@ class EventTurnEnd(Event):
     unit: Unit
 
 
+@dataclass
+class EventBattleStart(Event):
+    battle: "Battle"
+
+
 class BattlePhase(IntEnum):
     ready = auto()
     finish = auto()
@@ -206,8 +245,13 @@ class Battle:
         self.schedule = Schedule()
         self.chain = Chain()
         self.current_unit: Unit | None = None
+        self.started = False
 
-    def over(self):
+    def start(self):
+        self.started = True
+        trigger(EventBattleStart(self))
+
+    def is_over(self):
         return len([team for team in self.teams if not team.lost()]) <= 1
 
     def add_team(self, team: Team):
@@ -234,7 +278,7 @@ class Battle:
             self.chain.flush()
 
     def turn(self):
-        while not self.over():
+        while not self.is_over():
             yield BattlePhase.ready, self.turn_in()
             self.turn_out()
             yield BattlePhase.finish, self.current_unit
