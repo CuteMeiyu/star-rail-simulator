@@ -154,36 +154,36 @@ class WeaknessIgnore(_SimpleStat):
     pass
 
 
-class DebuffFlag(_FlexFlag):
-    bleed: "DebuffFlag"
-    burn: "DebuffFlag"
-    shock: "DebuffFlag"
-    wind_shear: "DebuffFlag"
-    frozen: "DebuffFlag"
-    entanglement: "DebuffFlag"
-    imprisonment: "DebuffFlag"
-    control: "DebuffFlag"
-    dot: "DebuffFlag"
+class BuffFlag(_FlexFlag):
+    bleed: "BuffFlag"
+    burn: "BuffFlag"
+    shock: "BuffFlag"
+    wind_shear: "BuffFlag"
+    frozen: "BuffFlag"
+    entanglement: "BuffFlag"
+    imprisonment: "BuffFlag"
+    control: "BuffFlag"
+    dot: "BuffFlag"
 
 
-DebuffFlag.frozen |= DebuffFlag.control
-DebuffFlag.entanglement |= DebuffFlag.control
-DebuffFlag.imprisonment |= DebuffFlag.control
-DebuffFlag.bleed |= DebuffFlag.dot
-DebuffFlag.burn |= DebuffFlag.dot
-DebuffFlag.shock |= DebuffFlag.dot
-DebuffFlag.wind_shear |= DebuffFlag.dot
+BuffFlag.frozen |= BuffFlag.control
+BuffFlag.entanglement |= BuffFlag.control
+BuffFlag.imprisonment |= BuffFlag.control
+BuffFlag.bleed |= BuffFlag.dot
+BuffFlag.burn |= BuffFlag.dot
+BuffFlag.shock |= BuffFlag.dot
+BuffFlag.wind_shear |= BuffFlag.dot
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, flag: DebuffFlag | None = None) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, buff_flag: BuffFlag | None = None) -> None:
         self.value = value
         self.multipiers: dict[int, float] = {}
-        if flag is None:
-            self.buff_flag = DebuffFlag()
+        if buff_flag is None:
+            self.buff_flag = BuffFlag()
         else:
-            self.buff_flag = flag
-        super().__init__(None)
+            self.buff_flag = buff_flag
+        super().__init__(flag)
 
     def __iadd__(self, other: _Self) -> _Self:
         if self.buff_flag == other.buff_flag:
@@ -200,8 +200,9 @@ class Effect_RES(Stat[float]):
 
 
 class DMG_Mitigation(Stat[float]):
-    def __init__(self, value=0.0) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.value = max(1 - value, 0)
+        super().__init__(flag)
 
     def __iadd__(self, other: _Self) -> _Self:
         self.value *= other.value
@@ -212,8 +213,9 @@ class DMG_Mitigation(Stat[float]):
 
 
 class _GroupStat(Stat[tuple[_T, ...]], _Generic[_T]):
-    def __init__(self, *value: _T):
+    def __init__(self, *value: _T, flag: _FlexFlag | _MixFlag | None = None):
         self.value = set(value)
+        super().__init__(flag)
 
     def __iadd__(self, other: _Self):
         self.value |= other.value
@@ -258,8 +260,9 @@ class CombatTypes(_GroupStat[CombatType]):
 
 
 class _IntStat(Stat[int]):
-    def __init__(self, value=0) -> None:
+    def __init__(self, value=0, flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.value = value
+        super().__init__(flag)
 
     def __iadd__(self, other: _Self) -> _Self:
         self.value += other.value
@@ -273,7 +276,7 @@ class Level(_IntStat):
     pass
 
 
-class WeaknessProtect(_IntStat):
+class WeaknessProtection(_IntStat):
     pass
 
 
@@ -293,9 +296,14 @@ class Stats:
         self.stats: list[Stat[_Any]] = list(stats)
         self.children: list[Stats] = []
         self.comment = comment
+        self._temp_flag: _FlexFlag | _MixFlag | None = None
 
     def get_stat(self, stat_type: type[_T_Stat], no_child=False, **kwargs: _Any) -> _T_Stat:
-        stat = stat_type(**kwargs)
+        if "flag" in kwargs and self._temp_flag is not None:
+            flag = _MixFlag(kwargs["flag"], self._temp_flag)
+        else:
+            flag = self._temp_flag
+        stat = stat_type(flag=flag, **kwargs)
         stack: list[Stats] = [self]
         while len(stack) > 0:
             child = stack.pop()
@@ -313,14 +321,16 @@ class Stats:
         return _deepcopy(self)
 
     @_contextmanager
-    def temp(self, temp_stats: "Stats | None" = None):
-        if temp_stats is not None:
-            self += temp_stats
+    def temp(self, stats: "Stats | None" = None, flag: _FlexFlag | _MixFlag | None = None):
+        if stats is not None:
+            self += stats
+        self._temp_flag = flag
         try:
             yield
         finally:
-            if temp_stats is not None:
-                self -= temp_stats
+            if stats is not None:
+                self -= stats
+            self._temp_flag = None
 
     def __iadd__(self, other: _Self) -> _Self:
         self.children.append(other)

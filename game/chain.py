@@ -1,4 +1,4 @@
-from bisect import insort_right
+from bisect import insort_left, insort_right
 
 
 class Node:
@@ -17,8 +17,17 @@ class Chain:
         self.nodes: list[Node] = []
         self.current_node: Node | None = None
 
-    def add(self, node: Node):
-        insort_right(self.nodes, node, key=lambda x: x.priority)
+    def __getitem__(self, index: int):
+        return self.nodes[index]
+
+    def __len__(self):
+        return len(self.nodes)
+
+    def add(self, node: Node, left_most=False):
+        if left_most:
+            insort_left(self.nodes, node, key=lambda x: x.priority)
+        else:
+            insort_right(self.nodes, node, key=lambda x: x.priority)
 
     def flush(self):
         while True:
@@ -28,5 +37,5 @@ class Chain:
             if len(self.nodes) == 0:
                 break
             self.current_node = self.nodes.pop(0)
-            self.current_node.run()
+            yield self.current_node
         self.current_node = None

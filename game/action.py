@@ -1,13 +1,29 @@
 import random
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, overload
 from weakref import ref
 
 from .chain import Node
-from .combat import Mod, Unit
-from .event import Event, trigger
+from .combat import EventNodeEnd, EventNodeStart, Mod, Team, Unit
+from .event import Event, listen, trigger
 from .flexflag import FlexFlag
 from .source import Source
+
+
+@dataclass
+class EventAction(Event):
+    action: "Action"
+
+
+@dataclass
+class EventActionEnd(Event):
+    action: "Action"
+
+
+@dataclass
+class EventAddTarget(Event):
+    action: "Action"
+    target: Unit
 
 
 class ActionFlag(FlexFlag):
@@ -24,12 +40,6 @@ class ActionFlag(FlexFlag):
 
 
 ActionFlag.counter |= ActionFlag.follow_up
-
-
-@dataclass
-class EventAddTarget(Event):
-    action: "Action"
-    target: Unit
 
 
 class Action(Node, Source):
@@ -87,15 +97,15 @@ class Action(Node, Source):
         self._targets_ref.append(ref(target))
         trigger(EventAddTarget(self, target))
 
-    def chain(self):
-        self.unit.team.battle.chain.add(self)
+    def chain(self, left_most=False):
+        self.unit.team.battle.chain.add(self, left_most)
 
 
 class BounceAction(Action):
     def bounce(self, hp_above_0=True, targets: list[Unit] | None = None):
         if targets is None:
             assert self.main_target is not None
-            targets = self.main_target.get_ally()
+            targets = self.main_target.get_allies()
         available_targets: list[Unit] = []
         if hp_above_0:
             available_targets = [ally for ally in targets if ally.status.hp > 0]
@@ -125,9 +135,26 @@ class ActionSupressor(Mod):
         return True
 
 
-class ActionController(Mod):
-    def __init__(self, source: Source | None, unit: Unit, priority=0) -> None:
-        super().__init__(source, unit, priority)
-
-    def choose_action(self, actions: list[Action]) -> Action | None:
+class ControllerGroup:
+    def choose_action(self, actions: list[Action], allow_skip=False) -> Action | None:
         return None
+
+
+class Controller(Mod):
+    def __init__(self, group: ControllerGroup, unit: Unit, priority=0) -> None:
+        super().__init__(None, unit, priority)
+        self.group = group
+
+
+def _on_node_start(event: EventNodeStart):
+    if isinstance(event.node, Action) and not isinstance(event.node, WeakAction):
+        trigger(EventAction(event.node))
+
+
+def _on_node_end(event: EventNodeEnd):
+    if isinstance(event.node, Action) and not isinstance(event.node, WeakAction):
+        trigger(EventActionEnd(event.node))
+
+
+listen(EventNodeStart, _on_node_start)
+listen(EventNodeEnd, _on_node_end)

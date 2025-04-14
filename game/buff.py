@@ -37,9 +37,10 @@ class EventBuffDispel(Event):
 
 class Buff(Mod):
     def __init__(
-        self, source: Source | None, name: str, unit: Unit, duration: int, flag: DebuffFlag, tick_type: TickType, dispelable=True, max_stack=0, priority=0
+        self, source: Source | None, name: str, unit: Unit, duration: int, flag: BuffFlag, tick_type: TickType, dispelable=True, max_stack=0, priority=0
     ) -> None:
         super().__init__(source, unit, priority)
+        self._keep_ref = source
         self.name = name
         self.tick_type = tick_type
         self.started = False
@@ -56,6 +57,7 @@ class Buff(Mod):
         trigger(EventBuffAdd(self))
 
     def remove(self):
+        self._keep_ref = None
         self.on_turn_start_listener.remove()
         self.on_turn_end_listener.remove()
         super().remove()

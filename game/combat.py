@@ -11,6 +11,83 @@ from .source import Source
 from .stats import *
 
 
+@dataclass
+class EventDead(Event):
+    unit: "Unit"
+
+
+@dataclass
+class EventRevive(Event):
+    unit: "Unit"
+    source: Source | None
+
+
+@dataclass
+class EventTurn(Event):
+    unit: "Unit"
+
+
+@dataclass
+class EventTurnEnd(Event):
+    unit: "Unit"
+
+
+@dataclass
+class EventBattleStart(Event):
+    battle: "Battle"
+
+
+@dataclass
+class EventNodeStart(Event):
+    battle: "Battle"
+    node: Node
+
+
+@dataclass
+class EventNodeEnd(Event):
+    battle: "Battle"
+    node: Node
+
+
+@dataclass
+class EventHPChange(Event):
+    source: Source | None
+    unit: "Unit"
+    amount: float
+
+
+@dataclass
+class EventEnergyChange(Event):
+    source: Source | None
+    unit: "Unit"
+    amount: float
+
+
+@dataclass
+class EventToughnessChange(Event):
+    source: Source | None
+    unit: "Unit"
+    amount: float
+
+
+@dataclass
+class EventSkillPointChange(Event):
+    source: Source | None
+    team: "Team"
+    amount: int
+
+
+@dataclass
+class EventWeaknessBreak(Event):
+    source: Source | None
+    unit: "Unit"
+
+
+@dataclass
+class EventWeaknessRestore(Event):
+    unit: "Unit"
+
+
 class Mod(Source):
     def __init__(self, source: Source | None, unit: "Unit", priority=0) -> None:
         super().__init__(source)
@@ -36,25 +113,15 @@ class Mod(Source):
 _T_Mod = TypeVar("_T_Mod", bound=Mod)
 
 
-@dataclass
-class EventDead(Event):
-    unit: "Unit"
-
-
-class Death(Node):
-    def __init__(self, unit: "Unit", priority=0) -> None:
+class Death(Node, Source):
+    def __init__(self, source: Source | None, unit: "Unit", priority=0) -> None:
         super().__init__(priority)
+        Source.__init__(self, source)
         self.unit = unit
 
     def run(self):
         self.unit.status.alive = False
         trigger(EventDead(self.unit))
-
-
-@dataclass
-class EventRevive(Event):
-    unit: "Unit"
-    source: Source | None
 
 
 class ReviveNode(Node, Source):
@@ -70,7 +137,30 @@ class ReviveNode(Node, Source):
         trigger(EventRevive(self.unit, self.source))
 
 
-class DeathProtect(Mod):
+class WeaknessRestore(Node):
+    def __init__(self, unit: "Unit", restore_percent=1.0, priority=0) -> None:
+        super().__init__(priority)
+        self.unit = unit
+        self.restore_percent = restore_percent
+
+    def run(self):
+        self.unit.status.broken = False
+        self.unit.status.toughness = self.unit.stats.get(Toughness) * self.restore_percent
+        trigger(EventWeaknessRestore(self.unit))
+
+
+class DeathProtection(Mod):
+    def __init__(self, source: Source | None, unit: "Unit", count=1, priority=0) -> None:
+        super().__init__(source, unit, priority)
+        self.count = count
+
+    def protect(self):
+        self.count -= 1
+        if self.count <= 0:
+            self.remove()
+
+
+class BreakProtection(Mod):
     def __init__(self, source: Source | None, unit: "Unit", count=1, priority=0) -> None:
         super().__init__(source, unit, priority)
         self.count = count
@@ -87,6 +177,7 @@ class Status:
     energy: float
     toughness: float
     alive: bool
+    broken: bool
 
 
 class Unit(Runner, Source):
@@ -100,6 +191,7 @@ class Unit(Runner, Source):
             energy=self.stats.get(Energy),
             toughness=self.stats.get(Toughness),
             alive=True,
+            broken=False,
         )
         self.team = team
         self.mods: list[Mod] = []
@@ -130,38 +222,53 @@ class Unit(Runner, Source):
     def remove(self):
         self.team.remove_unit(self)
 
-    def get_adjacent(self):
+    def get_adjacents(self):
         return self.team.get_adjacent_units(self)
 
-    def get_ally(self):
+    def get_allies(self):
         return self.team.get_units()
 
-    def cost_energy(self, source: Source | None, amount: float):
-        self.status.energy -= amount
-        self.status.energy = max(self.status.energy, 0.0)
+    def get_enemies(self):
+        return [enemy for team in self.team.battle.teams if team is not self.team for enemy in team.units]
 
-    def regenerate_energy(self, source: Source | None, amount: float, fixed: bool):
-        if not fixed:
+    def regenerate_energy(self, source: Source | None, amount: float, rated: bool):
+        if rated:
             amount *= 1.0 + self.stats.get(Energy_Regeneration_Rate)
+        self.change_energy(source, amount)
+
+    def change_energy(self, source: Source | None, amount: float):
+        energy = self.status.energy
         self.status.energy += amount
-        self.status.energy = min(self.status.energy, self.stats.get(Energy))
+        self.status.energy = max(0.0, min(self.status.energy, self.stats.get(Energy)))
+        trigger(EventEnergyChange(source, self, self.status.energy - energy))
 
-    def cost_hp(self, source: Source | None, amount: float):
-        self.status.hp -= amount
-        self.status.hp = max(self.status.hp, 0.0)
+    def change_hp(self, source: Source | None, amount: float):
+        hp = self.status.hp
+        self.status.hp += amount
+        self.status.hp = min(max(self.status.hp, 0.0), self.stats.get(HP))
+        trigger(EventHPChange(source, self, self.status.hp - hp))
         if self.status.hp <= 0.0:
-            protect = self.get_mod(DeathProtect)
-            if protect is not None:
-                protect.protect()
+            protection = self.get_mod(DeathProtection)
+            if protection is not None:
+                protection.protect()
             else:
-                self.team.battle.chain.add(Death(self))
+                self.team.battle.chain.add(Death(source, self))
 
+    def change_toughness(self, source: Source | None, amount: float):
+        toughness = self.status.toughness
+        self.status.toughness += amount
+        self.status.toughness = min(max(self.status.toughness, 0.0), self.stats.get(Toughness))
+        trigger(EventToughnessChange(source, self, self.status.toughness - toughness))
+        if self.status.toughness <= 0.0:
+            protection = self.get_mod(BreakProtection)
+            if protection is not None:
+                protection.protect()
+            else:
+                self.weakness_break(source)
 
-@dataclass
-class EventChangeSkillPoint(Event):
-    source: Source | None
-    team: "Team"
-    amount: int
+    def weakness_break(self, source: Source | None):
+        self.status.broken = True
+        trigger(EventWeaknessBreak(source, self))
 
 
 class Team:
@@ -214,24 +321,9 @@ class Team:
         return targets
 
     def change_skill_point(self, source: Source | None, amount: int):
-        trigger(EventChangeSkillPoint(source, self, amount))
+        trigger(EventSkillPointChange(source, self, amount))
         self.skill_point += amount
         self.skill_point = min(self.skill_point, self.max_skill_point)
-
-
-@dataclass
-class EventTurn(Event):
-    unit: Unit
-
-
-@dataclass
-class EventTurnEnd(Event):
-    unit: Unit
-
-
-@dataclass
-class EventBattleStart(Event):
-    battle: "Battle"
 
 
 class BattlePhase(IntEnum):
@@ -260,13 +352,19 @@ class Battle:
     def remove_team(self, team: Team):
         self.teams.remove(team)
 
+    def run_nodes(self):
+        for node in self.chain.flush():
+            trigger(EventNodeStart(self, node))
+            node.run()
+            trigger(EventNodeEnd(self, node))
+
     def turn_in(self):
         while True:
             runner = self.schedule.turn_in()
             if isinstance(runner, Unit):
                 self.current_unit = runner
                 trigger(EventTurn(runner))
-                self.chain.flush()
+                self.run_nodes()
                 return runner
             self.turn_out()
 
@@ -275,10 +373,11 @@ class Battle:
         self.schedule.turn_out()
         if isinstance(runner, Unit):
             trigger(EventTurnEnd(runner))
-            self.chain.flush()
+            self.run_nodes()
 
     def turn(self):
         while not self.is_over():
             yield BattlePhase.ready, self.turn_in()
             self.turn_out()
+            assert self.current_unit is not None
             yield BattlePhase.finish, self.current_unit

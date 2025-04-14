@@ -1,4 +1,4 @@
-from hsrgame.stats import *
+from game.stats import *
 
 from ...utils import generate_lv10_data, generate_lv15_data
 

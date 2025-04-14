@@ -15,11 +15,19 @@ def auto_positive():
 
 
 class Priority:
-    # Node
-    # Negative
-    UltActivate = auto_negative()
-    Death = auto_negative()
-    Counter = auto_negative()
-    
-    # Positive
-    Turn = auto_positive()
+    class Node:
+        # Negative
+        action_end = auto_negative()
+        ult_activate = auto_negative()
+        death = auto_negative()
+        counter = auto_negative()
+
+        # Positive
+        turn = auto_positive()
+
+    class Event:
+        ## Negative
+        first = auto_negative()
+
+        ## Positive
+        last = auto_positive()
