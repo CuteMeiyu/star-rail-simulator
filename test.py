@@ -9,6 +9,7 @@ from hsr.priority import Priority
 
 def on_node(event: EventNodeStart):
     if isinstance(event.node, Action):
+        print(team1.skill_point, team2.skill_point)
         print(event.node.__class__.__name__, event.node.unit.name)
     else:
         print(event.node.__class__.__name__)
@@ -26,7 +27,7 @@ def on_damage(event: EventDamage):
     damage = event.damage
     calculator = damage.damage_calculator
     name = getattr(damage.source, "name") if hasattr(damage.source, "name") else damage.source.__class__.__name__
-    print("Damage:", calculator.unit.name, name, calculator.calc())
+    print("Damage:", calculator.unit.name, name, calculator.target.name, calculator.calc())
     calculator.add_multipier(ZeroDamageMultipier(calculator))
 
 
@@ -38,7 +39,7 @@ class ConsoleController(ControllerGroup):
         cmd_dict: dict[str, Action | None] = {}
         for action in actions:
             cmd = ""
-            if ActionFlag.basic in action.flag:
+            if ActionFlag.basic in action.flag or ActionFlag.ult in action.flag:
                 cmd += "Q"
             elif ActionFlag.skill in action.flag:
                 cmd += "E"
@@ -63,12 +64,12 @@ team1.add()
 team2.add()
 for i in range(4):
     qq = Qingque(team1)
-    qq.name += f"-1-{i}"
+    qq.name += f"-1-{i+1}"
     qq.add()
     Controller(cg1, qq).add()
 for i in range(4):
     qq = Qingque(team2)
-    qq.name += f"-2-{i}"
+    qq.name += f"-2-{i+1}"
     qq.add()
     Controller(cg2, qq).add()
 for phase, unit in battle.turn():

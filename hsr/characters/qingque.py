@@ -176,7 +176,7 @@ class EnhausedBasic(Action):
         if passive is not None:
             passive.clear()
         self.add_target(self.main_target)
-        for adjacent in self.unit.get_adjacents():
+        for adjacent in self.main_target.get_adjacents():
             self.add_target(adjacent)
         Damage(self, self.unit, self.main_target, self.main_scale, 20, DamageFlag.basic, CombatType.quantum).deal()
         for target in self.minor_targets:
@@ -249,7 +249,7 @@ class EnhausedAutarky(Action):
     def run(self):
         assert self.main_target is not None
         self.add_target(self.main_target)
-        for adjacent in self.unit.get_adjacents():
+        for adjacent in self.main_target.get_adjacents():
             self.add_target(adjacent)
         Damage(self, self.unit, self.main_target, self.bind.main_scale, 20, DamageFlag.follow_up, CombatType.quantum).deal()
         for target in self.minor_targets:
