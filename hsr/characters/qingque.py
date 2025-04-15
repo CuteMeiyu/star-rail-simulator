@@ -8,8 +8,8 @@ from game.multipier import Damage, DamageFlag, EventDamage
 from game.source import Source
 from game.stats import *
 
-from ..character import Character, EventUnitReady, Turn, UltActivator
 from ..data.characters import qingque as data
+from ..hsr import Character, EventUnitReady, Indicator, StatusIndicator, Turn, UltActivator
 
 
 class Qingque(Character):
@@ -27,6 +27,8 @@ class Qingque(Character):
         if stats is None:
             stats = data.base_stats.deepcopy()
         super().__init__("Qingque", "QQ", stats, team, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_level)
+        StatusIndicator(self, HP).add()
+        StatusIndicator(self, Energy).add()
         Passive(self).add()
         BasicSkillProvider(self).add()
         UltActivator(self, UltProvider(self)).add()
@@ -51,11 +53,11 @@ class HiddenHandAnimation(WeakAction):
         super().__init__("Hidden Hand", unit)
 
 
-class Passive(Mod):
+class Passive(Indicator):
     def __init__(self, unit: Character) -> None:
         super().__init__(unit, unit)
         self.tiles = []
-        self.pool = ["Wan", "Tong", "Tiao"]
+        self.pool = ["A", "B", "C"]
         self.performed = False
 
     def add(self):
@@ -95,7 +97,7 @@ class Passive(Mod):
         self.tiles.clear()
 
     def cheat(self):
-        self.draw(4, ["Yu"])
+        self.draw(4, ["F"])
 
     def on_turn_start(self, event: EventTurn):
         if event.unit.team is not self.unit.team:
@@ -128,6 +130,9 @@ class Passive(Mod):
             return
         event.damage.damage_calculator.source_stats += Stats(DMG_Boost(0.1))
 
+    def string(self):
+        return "".join(self.tiles)
+
 
 class Basic(Action):
     def __init__(self, unit: Character, target: Unit) -> None:
@@ -137,7 +142,8 @@ class Basic(Action):
 
     def run(self):
         assert self.main_target is not None
-        self.unit.team.change_skill_point(self, 1)
+        assert isinstance(self.unit, Character)
+        self.unit.team.gain_skill_point(self, 1)
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.pop()
@@ -176,7 +182,7 @@ class EnhausedBasic(Action):
         if passive is not None:
             passive.clear()
         self.add_target(self.main_target)
-        for adjacent in self.main_target.get_adjacents():
+        for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
         Damage(self, self.unit, self.main_target, self.main_scale, 20, DamageFlag.basic, CombatType.quantum).deal()
         for target in self.minor_targets:
@@ -190,7 +196,7 @@ class EnhausedBasic(Action):
         if self.unit.get_mod(AutarkyBuff):
             EnhausedAutarky(self, self.unit, self.main_target).chain()
         if self.unit.check_eidolon(6):
-            self.unit.team.change_skill_point(self, 1)
+            self.unit.team.gain_skill_point(self, 1)
 
 
 class AScoopOfMoon(Buff):
@@ -249,7 +255,7 @@ class EnhausedAutarky(Action):
     def run(self):
         assert self.main_target is not None
         self.add_target(self.main_target)
-        for adjacent in self.main_target.get_adjacents():
+        for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
         Damage(self, self.unit, self.main_target, self.bind.main_scale, 20, DamageFlag.follow_up, CombatType.quantum).deal()
         for target in self.minor_targets:
@@ -266,9 +272,9 @@ class Skill(Action):
 
     def run(self):
         assert isinstance(self.unit, Character)
-        self.unit.team.change_skill_point(self, -1)
+        self.unit.team.cost_skill_point(self, 1)
         if self.unit.check_trace(1) and not self.unit.get_mod(Trace1Trigged):
-            self.unit.team.change_skill_point(self, 1)
+            self.unit.team.gain_skill_point(self, 1)
             Trace1Trigged(self.unit).add()
         self.add_target(self.unit)
         passive = self.unit.get_mod(Passive)
@@ -291,8 +297,8 @@ class Ult(Action):
 
     def run(self):
         assert isinstance(self.unit, Character)
-        self.unit.change_energy(self, -140)
-        for enemy in self.unit.get_enemies():
+        self.unit.status[Energy, self] -= 140
+        for enemy in self.unit.select_enemies():
             self.add_target(enemy)
         for target in self.targets:
             Damage(self, self.unit, target, self.scale, 20, DamageFlag.ult, CombatType.quantum).deal()
@@ -354,9 +360,9 @@ class BasicSkillProvider(ActionProvider):
         assert isinstance(self.unit, Character)
         actions: list[Action] = []
         if self.unit.get_mod(HiddenHand):
-            actions.extend(EnhausedBasic(self.unit, target) for target in self.unit.get_enemies())
+            actions.extend(EnhausedBasic(self.unit, target) for target in self.unit.select_enemies())
         else:
-            actions.extend(Basic(self.unit, target) for target in self.unit.get_enemies())
+            actions.extend(Basic(self.unit, target) for target in self.unit.select_enemies())
             if self.unit.team.skill_point > 0:
                 actions.append(Skill(self.unit))
         return actions

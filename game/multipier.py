@@ -181,7 +181,7 @@ class DMGMitigationMultipier(Multipier[DamageCalculator]):
 class BrokenMultipier(Multipier[DamageCalculator]):
     def __init__(self, calculator: DamageCalculator):
         super().__init__(calculator)
-        self.value = 1.0 if self.calculator.target.status.toughness <= 0.0 else 0.9
+        self.value = 1.0 if self.calculator.target.status[Toughness] <= 0.0 else 0.9
 
     def get(self):
         return self.value
@@ -248,7 +248,3 @@ class Damage(Source):
 
     def deal(self):
         trigger(EventDamage(self))
-        toughness_amount = self.toughness_calculator.calc()
-        self.toughness_calculator.target.change_toughness(self, -toughness_amount)
-        damage_amount = self.damage_calculator.calc()
-        self.damage_calculator.target.change_hp(self, -damage_amount)

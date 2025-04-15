@@ -1,10 +1,12 @@
+import math
 import random
 from dataclasses import dataclass
 
 from game.action import Action, ActionProvider, Controller, ControllerGroup, WeakAction
-from game.combat import Energy, Team, Unit
+from game.combat import Energy, Mod, Team, Unit
 from game.event import Event, trigger
-from game.stats import Stats
+from game.source import Source
+from game.stats import *
 
 from .priority import Priority
 
@@ -82,7 +84,7 @@ class Turn(WeakAction):
 
 class OverTurn(WeakAction):
     def __init__(self, unit: Unit) -> None:
-        super().__init__("Over Turn", unit)
+        super().__init__("Action End", unit, Priority.Node.action_end)
 
     def run(self):
         group_actions_dict: dict[ControllerGroup | None, list[Action]] = {}
@@ -128,7 +130,7 @@ class UltActivator(ActionProvider):
         self.min_energy_percent = min_energy_percent
 
     def get_available_actions(self) -> list[Action]:
-        if self.unit.status.energy < self.unit.stats.get(Energy) * self.min_energy_percent:
+        if self.unit.status[Energy] < self.unit.stats.get(Energy) * self.min_energy_percent:
             return []
         for node in self.unit.team.battle.chain.nodes + [self.unit.team.battle.chain.current_node]:
             if isinstance(node, UltExtraTurn) and node.unit is self.unit:
@@ -200,3 +202,37 @@ class Character(Unit):
 
     def disable_eidolon(self, eidolon_level: int):
         self.eidolon_flag &= ~(0b1000000 >> eidolon_level)
+
+    def regenerate_energy(self, source: Source | None, amount: float, rated: bool):
+        if rated:
+            amount *= 1.0 + self.stats[Energy_Regeneration_Rate]
+        self.status[Energy, source] += amount
+
+
+class Indicator(Mod):
+    def string(self) -> str:
+        return ""
+
+    def modify_unit_string(self, unit_string: str) -> str:
+        return unit_string
+
+
+class StatusIndicator(Indicator):
+    def __init__(self, unit: Unit, stat_type: type[Stat[float]], priority=0) -> None:
+        super().__init__(None, unit, priority)
+        self.stat_type = stat_type
+        self.previous = unit.status[stat_type]
+
+    def string(self):
+        if not math.isclose(self.previous, self.unit.status[self.stat_type]):
+            result = f"{int(self.previous)}{self.unit.status[self.stat_type]-self.previous:+.0f}"
+        else:
+            result = str(int(self.unit.status[self.stat_type]))
+        self.previous = self.unit.status[self.stat_type]
+        return result
+
+
+class Enemy(Unit):
+    def __init__(self, name: str, schedule_name: str, stats: Stats, team: Team) -> None:
+        super().__init__(name, schedule_name, stats, team)
+        self.status[Toughness] = self.stats[Toughness]

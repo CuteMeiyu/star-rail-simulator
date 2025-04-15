@@ -1,7 +1,7 @@
 from bisect import insort_right
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 from weakref import ref
 
 from .chain import Chain, Node
@@ -9,6 +9,8 @@ from .event import Event, trigger
 from .schedule import Runner, Schedule
 from .source import Source
 from .stats import *
+
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -77,15 +79,16 @@ class EventSkillPointChange(Event):
     amount: int
 
 
+_T_Stat = TypeVar("_T_Stat", bound=Stat)
+
+
 @dataclass
-class EventWeaknessBreak(Event):
+class EventStatusChange(Event, Generic[_T_Stat, _T]):
     source: Source | None
     unit: "Unit"
-
-
-@dataclass
-class EventWeaknessRestore(Event):
-    unit: "Unit"
+    stat_type: type[_T_Stat]
+    previous: _T
+    current: _T
 
 
 class Mod(Source):
@@ -120,7 +123,7 @@ class Death(Node, Source):
         self.unit = unit
 
     def run(self):
-        self.unit.status.alive = False
+        self.unit.status[Alive] = False
         trigger(EventDead(self.unit))
 
 
@@ -132,21 +135,9 @@ class ReviveNode(Node, Source):
         self.hp_percent = hp_percent
 
     def run(self):
-        self.unit.status.alive = True
-        self.unit.status.hp = self.unit.stats.get(HP) * self.hp_percent
+        self.unit.status[Alive] = True
+        self.unit.status[HP] = self.unit.stats[HP] * self.hp_percent
         trigger(EventRevive(self.unit, self.source))
-
-
-class WeaknessRestore(Node):
-    def __init__(self, unit: "Unit", restore_percent=1.0, priority=0) -> None:
-        super().__init__(priority)
-        self.unit = unit
-        self.restore_percent = restore_percent
-
-    def run(self):
-        self.unit.status.broken = False
-        self.unit.status.toughness = self.unit.stats.get(Toughness) * self.restore_percent
-        trigger(EventWeaknessRestore(self.unit))
 
 
 class DeathProtection(Mod):
@@ -160,24 +151,33 @@ class DeathProtection(Mod):
             self.remove()
 
 
-class BreakProtection(Mod):
-    def __init__(self, source: Source | None, unit: "Unit", count=1, priority=0) -> None:
-        super().__init__(source, unit, priority)
-        self.count = count
+class StatusWrapper:
+    def __init__(self, unit: "Unit", status: Status) -> None:
+        self._unit_ref = ref(unit)
+        self.status = status
 
-    def protect(self):
-        self.count -= 1
-        if self.count <= 0:
-            self.remove()
+    @property
+    def unit(self):
+        unit = self._unit_ref()
+        assert unit is not None
+        return unit
 
+    def __getitem__(self, stat_type_or_tuple: type[Stat[_T]] | tuple[type[Stat[_T]], Source | None]) -> _T:
+        if isinstance(stat_type_or_tuple, tuple):
+            stat_type, _ = stat_type_or_tuple
+        else:
+            stat_type = stat_type_or_tuple
+        return self.status[stat_type]
 
-@dataclass
-class Status:
-    hp: float
-    energy: float
-    toughness: float
-    alive: bool
-    broken: bool
+    def __setitem__(self, stat_type_or_tuple: type[Stat[_T]] | tuple[type[Stat[_T]], Source | None], value: _T):
+        if isinstance(stat_type_or_tuple, tuple):
+            stat_type, source = stat_type_or_tuple
+        else:
+            stat_type = stat_type_or_tuple
+            source = None
+        previous = self.status[stat_type]
+        self.status[stat_type] = value
+        trigger(EventStatusChange(source, self.unit, stat_type, previous, value))
 
 
 class Unit(Runner, Source):
@@ -186,22 +186,16 @@ class Unit(Runner, Source):
         Source.__init__(self, None)
         self.name = name
         self.stats = stats
-        self.status = Status(
-            hp=self.stats.get(HP),
-            energy=self.stats.get(Energy),
-            toughness=self.stats.get(Toughness),
-            alive=True,
-            broken=False,
-        )
+        self.status = StatusWrapper(self, Status({HP: stats[HP], Alive: True}))
         self.team = team
         self.mods: list[Mod] = []
 
     @property
     def selectable(self):
-        return self.status.alive and not self.stats.get(OffField)
+        return self.status[Alive] and not self.stats[OffField]
 
     def get_speed(self):
-        return self.stats.get(SPD)
+        return self.stats[SPD]
 
     def get_mod(self, mod_cls: type[_T_Mod]):
         for mod in self.mods:
@@ -222,53 +216,14 @@ class Unit(Runner, Source):
     def remove(self):
         self.team.remove_unit(self)
 
-    def get_adjacents(self):
-        return self.team.get_adjacent_units(self)
+    def select_adjacents(self):
+        return self.team.select_adjacent_units(self)
 
-    def get_allies(self):
-        return self.team.get_units()
+    def select_allies(self):
+        return self.team.select_all_units()
 
-    def get_enemies(self):
+    def select_enemies(self):
         return [enemy for team in self.team.battle.teams if team is not self.team for enemy in team.units]
-
-    def regenerate_energy(self, source: Source | None, amount: float, rated: bool):
-        if rated:
-            amount *= 1.0 + self.stats.get(Energy_Regeneration_Rate)
-        self.change_energy(source, amount)
-
-    def change_energy(self, source: Source | None, amount: float):
-        energy = self.status.energy
-        self.status.energy += amount
-        self.status.energy = max(0.0, min(self.status.energy, self.stats.get(Energy)))
-        trigger(EventEnergyChange(source, self, self.status.energy - energy))
-
-    def change_hp(self, source: Source | None, amount: float):
-        hp = self.status.hp
-        self.status.hp += amount
-        self.status.hp = min(max(self.status.hp, 0.0), self.stats.get(HP))
-        trigger(EventHPChange(source, self, self.status.hp - hp))
-        if self.status.hp <= 0.0:
-            protection = self.get_mod(DeathProtection)
-            if protection is not None:
-                protection.protect()
-            else:
-                self.team.battle.chain.add(Death(source, self))
-
-    def change_toughness(self, source: Source | None, amount: float):
-        toughness = self.status.toughness
-        self.status.toughness += amount
-        self.status.toughness = min(max(self.status.toughness, 0.0), self.stats.get(Toughness))
-        trigger(EventToughnessChange(source, self, self.status.toughness - toughness))
-        if self.status.toughness <= 0.0:
-            protection = self.get_mod(BreakProtection)
-            if protection is not None:
-                protection.protect()
-            else:
-                self.weakness_break(source)
-
-    def weakness_break(self, source: Source | None):
-        self.status.broken = True
-        trigger(EventWeaknessBreak(source, self))
 
 
 class Team:
@@ -285,7 +240,7 @@ class Team:
         self.battle.remove_team(self)
 
     def lost(self):
-        return all(not unit.status.alive for unit in self.units)
+        return all(not unit.status[Alive] for unit in self.units)
 
     def add_unit(self, unit: Unit, index=-1):
         if index == -1:
@@ -302,7 +257,7 @@ class Team:
         self.units.remove(unit)
         self.battle.schedule.remove(unit)
 
-    def get_adjacent_units(self, unit: Unit):
+    def select_adjacent_units(self, unit: Unit):
         index = self.units.index(unit)
         targets: list[Unit] = []
         for indexer in range(index - 1, -1, -1), range(index + 1, len(self.units)):
@@ -313,17 +268,24 @@ class Team:
                 break
         return targets
 
-    def get_units(self):
+    def select_all_units(self):
         targets: list[Unit] = []
         for unit in self.units:
             if unit.selectable:
                 targets.append(unit)
         return targets
 
-    def change_skill_point(self, source: Source | None, amount: int):
-        trigger(EventSkillPointChange(source, self, amount))
+    def gain_skill_point(self, source: Source | None, amount=1):
+        sp = self.skill_point
         self.skill_point += amount
         self.skill_point = min(self.skill_point, self.max_skill_point)
+        trigger(EventSkillPointChange(source, self, self.skill_point - sp))
+
+    def cost_skill_point(self, source: Source | None, amount=1):
+        sp = self.skill_point
+        self.skill_point -= amount
+        self.skill_point = max(self.skill_point, 0)
+        trigger(EventSkillPointChange(source, self, self.skill_point - sp))
 
 
 class BattlePhase(IntEnum):

@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import Any, Literal, overload
+from typing import Any
 from weakref import ref
 
 from .chain import Node
@@ -8,6 +8,7 @@ from .combat import EventNodeEnd, EventNodeStart, Mod, Team, Unit
 from .event import Event, listen, trigger
 from .flexflag import FlexFlag
 from .source import Source
+from .stats import HP, Alive
 
 
 @dataclass
@@ -82,7 +83,7 @@ class Action(Node, Source):
                 yield target
 
     def condition(self):
-        return self.unit.status.alive
+        return self.unit.status[Alive]
 
     def check(self):
         if not self.condition():
@@ -105,10 +106,10 @@ class BounceAction(Action):
     def bounce(self, hp_above_0=True, targets: list[Unit] | None = None):
         if targets is None:
             assert self.main_target is not None
-            targets = self.main_target.get_allies()
+            targets = self.main_target.select_allies()
         available_targets: list[Unit] = []
         if hp_above_0:
-            available_targets = [ally for ally in targets if ally.status.hp > 0]
+            available_targets = [ally for ally in targets if ally.status[HP] > 0]
         if len(available_targets) == 0:
             available_targets = targets
         target = random.choice(available_targets)
@@ -136,8 +137,7 @@ class ActionSupressor(Mod):
 
 
 class ControllerGroup:
-    def choose_action(self, actions: list[Action], allow_skip=False) -> Action | None:
-        return None
+    def choose_action(self, actions: list[Action], allow_skip=False) -> Action | None: ...
 
 
 class Controller(Mod):

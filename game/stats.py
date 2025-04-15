@@ -288,6 +288,33 @@ class OffTimeline(_IntStat):
     pass
 
 
+class BoolStat(Stat[bool]):
+    default = False
+
+    def __init__(self, flag: _FlexFlag | _MixFlag | None = None) -> None:
+        super().__init__(flag)
+        self.value = self.default
+
+    def __init_subclass__(cls, default: bool) -> None:
+        cls.default = default
+        return super().__init_subclass__()
+
+    def __iadd__(self, other: _Self) -> _Self:
+        self.value = other.value
+        return self
+
+    def get_value(self) -> bool:
+        return self.value
+
+
+class Alive(BoolStat, default=True):
+    pass
+
+
+class Broken(BoolStat, default=False):
+    pass
+
+
 _T_Stat = _TypeVar("_T_Stat", bound=Stat)
 
 
@@ -317,6 +344,9 @@ class Stats:
     def get(self, stat_type: type[Stat[_T]], no_child=False, **kwargs: _Any) -> _T:
         return self.get_stat(stat_type, no_child, **kwargs).get_value()
 
+    def __getitem__(self, stat_type: type[Stat[_T]]):
+        return self.get(stat_type)
+
     def deepcopy(self):
         return _deepcopy(self)
 
@@ -339,3 +369,19 @@ class Stats:
     def __isub__(self, other: _Self) -> _Self:
         self.children.remove(other)
         return self
+
+
+class Status:
+    def __init__(self, dict: dict[type[Stat[_Any]], _Any]) -> None:
+        self.dict = dict.copy()
+
+    def __contains__(self, status_type: type[Stat[_T]]) -> bool:
+        return status_type in self.dict
+
+    def __getitem__(self, status_type: type[Stat[_T]]) -> _T:
+        if status_type not in self.dict:
+            return status_type().get_value()
+        return self.dict[status_type]
+
+    def __setitem__(self, status_type: type[Stat[_T]], value: _T):
+        self.dict[status_type] = value

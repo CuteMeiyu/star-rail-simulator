@@ -1,14 +1,14 @@
 from game.stats import *
 
-from ...utils import generate_lv10_data, generate_lv15_data
+from ..utils import generate_lv10_data, generate_lv15_data
 
 base_stats = Stats(
-    HP(base=1023.1),
-    ATK(base=652.68),
-    DEF(base=441.0),
-    SPD(base=98.0),
-    Energy(base=140.0),
-    Aggro(base=75.0),
+    HP(1023.1),
+    ATK(652.68),
+    DEF(441.0),
+    SPD(98.0),
+    Energy(140.0),
+    Aggro(75.0),
     Level(80),
     CRIT_Rate(0.05),
     CRIT_DMG(0.5),

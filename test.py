@@ -1,16 +1,17 @@
-from game.action import Action, ActionFlag, Controller, ControllerGroup
-from game.combat import Battle, BattlePhase, EventNodeStart, Team
+from game.action import Action, ActionFlag, Controller, ControllerGroup, EventActionEnd
+from game.combat import Battle, BattlePhase, EventNodeStart, Team, Unit
 from game.event import listen
 from game.multipier import DamageCalculator, EventDamage, Multipier
-from hsr.character import OverTurn, Turn, UltActivate
+from game.stats import Energy
 from hsr.characters import *
+from hsr.enemies import *
+from hsr.hsr import Indicator, OverTurn, Turn, UltActivate
 from hsr.priority import Priority
 
 
 def on_node(event: EventNodeStart):
     if isinstance(event.node, Action):
-        print(team1.skill_point, team2.skill_point)
-        print(event.node.__class__.__name__, event.node.unit.name)
+        print(event.node.name, event.node.unit.name)
     else:
         print(event.node.__class__.__name__)
 
@@ -34,8 +35,44 @@ def on_damage(event: EventDamage):
 listen(EventDamage, on_damage, Priority.Event.last)
 
 
+def on_action_end(event: EventActionEnd):
+    OverTurn(event.action.unit).chain()
+
+
+listen(EventActionEnd, on_action_end, Priority.Event.first)
+
+
+class CurrentActorIndicator(Indicator):
+    def __init__(self, unit: Unit) -> None:
+        super().__init__(None, unit)
+
+    def modify_unit_string(self, unit_string: str) -> str:
+        return f"[{unit_string}]"
+
+
+def get_unit_string(unit: Unit):
+    string = f"{unit.name}({'|'.join(indicator.string() for indicator in unit.get_mods(Indicator) if len(indicator.string()) > 0)})"
+    for indicator in unit.get_mods(Indicator):
+        string = indicator.modify_unit_string(string)
+    return string
+
+
+def get_team_string(team: Team, sep="\t"):
+    return sep.join(get_unit_string(unit) for unit in team.units)
+
+
+def print_battle(battle: Battle):
+    print(battle.schedule)
+    print(t1.skill_point)
+    for team in battle.teams:
+        print(get_team_string(team))
+
+
 class ConsoleController(ControllerGroup):
     def choose_action(self, actions: list[Action], allow_skip=False) -> Action | None:
+        if len(actions) == 0:
+            return None
+        print_battle(actions[0].unit.team.battle)
         cmd_dict: dict[str, Action | None] = {}
         for action in actions:
             cmd = ""
@@ -50,34 +87,40 @@ class ConsoleController(ControllerGroup):
             cmd_dict[cmd] = action
         if allow_skip:
             cmd_dict["X"] = None
-        print(cmd_dict.keys())
-        cmd = input("Input Command: ")
+        print(*cmd_dict.keys())
+        while True:
+            cmd = input("Input Command: ").upper()
+            if cmd in cmd_dict:
+                break
+            print("Invalid Command!")
         return cmd_dict[cmd]
 
 
 cg1 = ConsoleController()
-cg2 = ConsoleController()
-battle = Battle()
-team1 = Team(battle)
-team2 = Team(battle)
-team1.add()
-team2.add()
+# cg2 = ConsoleController()
+b1 = Battle()
+t1 = Team(b1)
+t2 = Team(b1)
+t1.add()
+t2.add()
 for i in range(4):
-    qq = Qingque(team1)
-    qq.name += f"-1-{i+1}"
+    qq = Qingque(t1)
+    qq.name += f"-{i+1}"
     qq.add()
+    qq.status[Energy] = 0.5 * qq.stats[Energy]
     Controller(cg1, qq).add()
-for i in range(4):
-    qq = Qingque(team2)
-    qq.name += f"-2-{i+1}"
-    qq.add()
-    Controller(cg2, qq).add()
-for phase, unit in battle.turn():
-    print(battle.schedule)
+for i in range(3):
+    dm = Dummy(t2)
+    dm.name += f"-{i+1}"
+    dm.add()
+    # Controller(cg2, qq).add()
+b1.start()
+for phase, unit in b1.turn():
     if phase == BattlePhase.ready:
+        CurrentActorIndicator(unit).add()
         Turn(unit).chain()
-        battle.run_nodes()
+        b1.run_nodes()
+        indicator = unit.get_mod(CurrentActorIndicator)
+        if indicator is not None:
+            indicator.remove()
         print()
-    else:
-        OverTurn(unit).chain()
-        battle.run_nodes()
