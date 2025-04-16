@@ -4,9 +4,9 @@ from game.action import Action, ActionFlag, ActionProvider, WeakAction
 from game.buff import Buff, TickType
 from game.combat import EventBattleStart, EventTurn, Mod, Team, Unit
 from game.event import listen
-from game.multipier import DamageFlag, EventDamage, cost_energy, deal_damage, regenerate_energy
 from game.source import Source
 from game.stats import *
+from game.statusmanager import DamageFlag, EventDamage, cost_energy, deal_damage, regenerate_energy
 
 from ..data.characters import qingque as data
 from ..hsr import Character, EventUnitReady, Indicator, StatusIndicator, Turn, UltActivator

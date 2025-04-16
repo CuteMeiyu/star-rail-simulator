@@ -2,9 +2,9 @@ import random
 
 from game.action import Action, ActionFlag, ActionProvider, ControllerGroup
 from game.combat import Team, Unit
-from game.multipier import DamageFlag, deal_damage, regenerate_energy
 from game.source import Source
 from game.stats import *
+from game.statusmanager import DamageFlag, deal_damage, regenerate_energy
 
 from ..hsr import Enemy, StatusIndicator
 

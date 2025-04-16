@@ -1,8 +1,8 @@
 from game.action import Action, ActionFlag, Controller, ControllerGroup, EventActionEnd, WeakAction
 from game.combat import Battle, BattlePhase, EventNodeStart, Team, Unit
 from game.event import listen
-from game.multipier import Damage, EventDamage, Multipier
 from game.stats import Energy
+from game.statusmanager import Damage, EventDamage, Multipier
 from hsr.characters import *
 from hsr.enemies import *
 from hsr.hsr import Indicator, OverTurn, Turn, UltActivate
