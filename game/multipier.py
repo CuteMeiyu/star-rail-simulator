@@ -13,11 +13,6 @@ from .source import Source
 from .stats import *
 
 
-@dataclass
-class EventDamage(Event):
-    damage: "Damage"
-
-
 def clamp(value: float, lower_bound: float, upper_bound: float):
     return min(max(lower_bound, value), upper_bound)
 
@@ -72,6 +67,8 @@ class Calculator:
     def calc(self):
         return math.prod(multipier.get() for multipier in self.multipiers)
 
+    def deal(self): ...
+
 
 class DamageFlag(FlexFlag):
     basic: "DamageFlag"
@@ -89,17 +86,24 @@ DamageFlag.counter |= DamageFlag.follow_up
 DamageFlag.super_break |= DamageFlag.breaking
 
 
-class DamageCalculator(Calculator):
+@dataclass
+class EventDamage(Event):
+    damage: "Damage"
+
+
+class Damage(Calculator, Source):
     def __init__(
         self,
+        source: Source | None,
         unit: Unit,
         target: Unit,
         scale: float,
         flag: DamageFlag,
-        combat_type: CombatType,
+        element: ElementFlag,
         stat_type: type[Stat[float]] = ATK,
     ) -> None:
         super().__init__()
+        Source.__init__(self, source)
         self.unit = unit
         self.target = target
         self.source_stats = Stats()
@@ -108,7 +112,7 @@ class DamageCalculator(Calculator):
         self.target_stats += self.target.stats
         self.scale = scale
         self.flag = flag
-        self.combat_type = combat_type
+        self.element = element
         self.stat_type = stat_type
         self.add_multipiers(
             BaseDamageMultipier(self),
@@ -123,18 +127,21 @@ class DamageCalculator(Calculator):
         )
 
     def calc(self):
-        with self.source_stats.temp(flag=self.flag):
-            with self.target_stats.temp(flag=self.flag):
+        with self.source_stats.temp(flag=self.flag | self.element):
+            with self.target_stats.temp(flag=self.flag | self.element):
                 return super().calc()
 
+    def deal(self):
+        trigger(EventDamage(self))
 
-class BaseDamageMultipier(Multipier[DamageCalculator]):
+
+class BaseDamageMultipier(Multipier[Damage]):
     def get(self):
         return self.calculator.scale * self.calculator.source_stats.get(self.calculator.stat_type)
 
 
-class CritMultipier(Multipier[DamageCalculator]):
-    def __init__(self, calculator: DamageCalculator):
+class CritMultipier(Multipier[Damage]):
+    def __init__(self, calculator: Damage):
         super().__init__(calculator)
         self.rng = random.random()
 
@@ -145,17 +152,17 @@ class CritMultipier(Multipier[DamageCalculator]):
         return 1.0 + self.calculator.source_stats.get(CRIT_DMG) if self.is_crit() else 1.0
 
 
-class DamageBoostMultipier(Multipier[DamageCalculator]):
+class DamageBoostMultipier(Multipier[Damage]):
     def get(self):
         return 1.0 + self.calculator.source_stats.get(DMG_Boost)
 
 
-class WeakenMultipier(Multipier[DamageCalculator]):
+class WeakenMultipier(Multipier[Damage]):
     def get(self):
         return clamp(1.0 - self.calculator.source_stats.get(Weaken), 0.0, 1.0)
 
 
-class DefenseMultipier(Multipier[DamageCalculator]):
+class DefenseMultipier(Multipier[Damage]):
     def get(self):
         with self.calculator.target_stats.temp(Stats(DEF(decrease=self.calculator.source_stats.get(DEF_Ignore)))):
             return (self.calculator.source_stats.get(Level) * 10.0 + 200.0) / (
@@ -163,23 +170,23 @@ class DefenseMultipier(Multipier[DamageCalculator]):
             )
 
 
-class ResistanceMultipier(Multipier[DamageCalculator]):
+class ResistanceMultipier(Multipier[Damage]):
     def get(self):
         return clamp(1.0 - self.calculator.target_stats.get(DMG_RES) + self.calculator.source_stats.get(RES_PEN), 0.0, 2.0)
 
 
-class VulnerabilityMultipier(Multipier[DamageCalculator]):
+class VulnerabilityMultipier(Multipier[Damage]):
     def get(self):
         return 1.0 + self.calculator.target_stats.get(Vulnerability)
 
 
-class DMGMitigationMultipier(Multipier[DamageCalculator]):
+class DMGMitigationMultipier(Multipier[Damage]):
     def get(self):
         return max(1.0 - self.calculator.target_stats.get(DMG_Mitigation), 0.0)
 
 
-class BrokenMultipier(Multipier[DamageCalculator]):
-    def __init__(self, calculator: DamageCalculator):
+class BrokenMultipier(Multipier[Damage]):
+    def __init__(self, calculator: Damage):
         super().__init__(calculator)
         self.value = 1.0 if self.calculator.target.status[Toughness] <= 0.0 else 0.9
 
@@ -187,9 +194,15 @@ class BrokenMultipier(Multipier[DamageCalculator]):
         return self.value
 
 
-class ToughnessCalculator(Calculator):
-    def __init__(self, unit: Unit, target: Unit, amount: float, flag: DamageFlag, combat_type: CombatType) -> None:
+@dataclass
+class EventToughnessDamage(Event):
+    damage: "ToughnessDamage"
+
+
+class ToughnessDamage(Calculator, Source):
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, amount: float, flag: DamageFlag, element: ElementFlag) -> None:
         super().__init__()
+        Source.__init__(self, source)
         self.unit = unit
         self.target = target
         self.source_stats = Stats()
@@ -198,7 +211,7 @@ class ToughnessCalculator(Calculator):
         self.target_stats += self.target.stats
         self.base_amount = amount
         self.flag = flag
-        self.combat_type = combat_type
+        self.element = element
         self.add_multipiers(
             BaseToughnessMultipier(self),
             BreakEfficiencyMultipier(self),
@@ -206,45 +219,81 @@ class ToughnessCalculator(Calculator):
         )
 
     def calc(self):
-        with self.source_stats.temp(flag=self.flag):
-            with self.target_stats.temp(flag=self.flag):
+        with self.source_stats.temp(flag=self.flag | self.element):
+            with self.target_stats.temp(flag=self.flag | self.element):
                 return super().calc()
 
+    def deal(self):
+        trigger(EventToughnessDamage(self))
 
-class BaseToughnessMultipier(Multipier[ToughnessCalculator]):
+
+class BaseToughnessMultipier(Multipier[ToughnessDamage]):
     def get(self):
         return self.calculator.base_amount
 
 
-class BreakEfficiencyMultipier(Multipier[ToughnessCalculator]):
+class BreakEfficiencyMultipier(Multipier[ToughnessDamage]):
     def get(self):
         return 1.0 + self.calculator.source_stats.get(Break_Efficiency)
 
 
-class WeaknessMultipier(Multipier[ToughnessCalculator]):
+class WeaknessMultipier(Multipier[ToughnessDamage]):
     def get(self):
         if self.calculator.target_stats.get(WeaknessProtection) > 0:
             return 0.0
-        if self.calculator.combat_type in self.calculator.target_stats.get(Weakness):
+        if self.calculator.target_stats.get_stat(Weakness).has_intersection(self.calculator.element):
             return 1.0
         return min(self.calculator.source_stats.get(WeaknessIgnore), 1.0)
 
 
-class Damage(Source):
-    def __init__(
-        self,
-        source: Source | None,
-        unit: Unit,
-        target: Unit,
-        scale: float,
-        toughness: float,
-        flag: DamageFlag,
-        combat_type: CombatType,
-        stat_type: type[Stat[float]] = ATK,
-    ) -> None:
-        super().__init__(source)
-        self.damage_calculator = DamageCalculator(unit, target, scale, flag, combat_type, stat_type)
-        self.toughness_calculator = ToughnessCalculator(unit, target, toughness, flag, combat_type)
+def deal_damage(
+    source: Source | None,
+    unit: Unit,
+    target: Unit,
+    scale: float,
+    toughness: float,
+    flag: DamageFlag,
+    element: ElementFlag,
+    stat_type: type[Stat[float]] = ATK,
+):
+    damage = Damage(source, unit, target, scale, flag, element, stat_type)
+    toughness_damage = ToughnessDamage(source, unit, target, toughness, flag, element)
+    toughness_damage.deal()
+    damage.deal()
+
+
+class EnergyRegenerate(Calculator, Source):
+    def __init__(self, source: Source | None, unit: Unit, amount: float, apply_regeneration_rate: bool) -> None:
+        super().__init__()
+        Source.__init__(self, source)
+        self.unit = unit
+        self.amount = amount
+        self.rated = apply_regeneration_rate
+        self.add_multipiers(
+            EnergyAmountMultipier(self),
+            EnergyRegenerationRateMultipier(self),
+        )
 
     def deal(self):
-        trigger(EventDamage(self))
+        # trigger(EventEnergyRegenerate(self))
+        amount = self.calc()
+        self.unit.status[Energy] = min(self.unit.stats[Energy], self.unit.status[Energy] + amount)
+
+
+class EnergyAmountMultipier(Multipier[EnergyRegenerate]):
+    def get(self) -> float:
+        return self.calculator.amount
+
+
+class EnergyRegenerationRateMultipier(Multipier[EnergyRegenerate]):
+    def get(self) -> float:
+        return 1.0 + self.calculator.unit.stats.get(Energy_Regeneration_Rate) if self.calculator.rated else 1.0
+
+
+def regenerate_energy(source: Source | None, unit: Unit, amount: float, apply_regeneration_rate: bool):
+    EnergyRegenerate(source, unit, amount, apply_regeneration_rate).deal()
+
+
+def cost_energy(source: Source | None, unit: Unit, amount: float):
+    # EnergyCost(source, unit, amount).deal()
+    unit.status[Energy] = max(0.0, unit.status[Energy] - amount)

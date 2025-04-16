@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from game.action import Action, ActionProvider, Controller, ControllerGroup, WeakAction
 from game.combat import Energy, Mod, Team, Unit
 from game.event import Event, trigger
-from game.source import Source
 from game.stats import *
 
 from .priority import Priority
@@ -202,11 +201,6 @@ class Character(Unit):
 
     def disable_eidolon(self, eidolon_level: int):
         self.eidolon_flag &= ~(0b1000000 >> eidolon_level)
-
-    def regenerate_energy(self, source: Source | None, amount: float, rated: bool):
-        if rated:
-            amount *= 1.0 + self.stats[Energy_Regeneration_Rate]
-        self.status[Energy, source] += amount
 
 
 class Indicator(Mod):

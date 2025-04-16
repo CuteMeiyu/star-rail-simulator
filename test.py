@@ -1,7 +1,7 @@
-from game.action import Action, ActionFlag, Controller, ControllerGroup, EventActionEnd
+from game.action import Action, ActionFlag, Controller, ControllerGroup, EventActionEnd, WeakAction
 from game.combat import Battle, BattlePhase, EventNodeStart, Team, Unit
 from game.event import listen
-from game.multipier import DamageCalculator, EventDamage, Multipier
+from game.multipier import Damage, EventDamage, Multipier
 from game.stats import Energy
 from hsr.characters import *
 from hsr.enemies import *
@@ -10,26 +10,25 @@ from hsr.priority import Priority
 
 
 def on_node(event: EventNodeStart):
-    if isinstance(event.node, Action):
-        print(event.node.name, event.node.unit.name)
+    if isinstance(event.node, Action) and not isinstance(event.node, WeakAction):
+        print("Action:", event.node.name, event.node.unit.name)
     else:
-        print(event.node.__class__.__name__)
+        print("Node:", event.node.__class__.__name__)
 
 
 listen(EventNodeStart, on_node)
 
 
-class ZeroDamageMultipier(Multipier[DamageCalculator]):
+class ZeroDamageMultipier(Multipier[Damage]):
     def get(self) -> float:
         return 0.0
 
 
 def on_damage(event: EventDamage):
     damage = event.damage
-    calculator = damage.damage_calculator
     name = getattr(damage.source, "name") if hasattr(damage.source, "name") else damage.source.__class__.__name__
-    print("Damage:", calculator.unit.name, name, calculator.target.name, calculator.calc())
-    calculator.add_multipier(ZeroDamageMultipier(calculator))
+    print("Damage:", damage.unit.name, name, damage.target.name, damage.calc())
+    damage.add_multipier(ZeroDamageMultipier(damage))
 
 
 listen(EventDamage, on_damage, Priority.Event.last)
@@ -63,7 +62,7 @@ def get_team_string(team: Team, sep="\t"):
 
 def print_battle(battle: Battle):
     print(battle.schedule)
-    print(t1.skill_point)
+    print("Skill Point:", t1.skill_point)
     for team in battle.teams:
         print(get_team_string(team))
 
@@ -73,23 +72,46 @@ class ConsoleController(ControllerGroup):
         if len(actions) == 0:
             return None
         print_battle(actions[0].unit.team.battle)
-        cmd_dict: dict[str, Action | None] = {}
+        code_target_action: dict[str, dict[str, Action]] = {}
         for action in actions:
-            cmd = ""
-            if ActionFlag.basic in action.flag or ActionFlag.ult in action.flag:
-                cmd += "Q"
+            ability_code = ""
+            if ActionFlag.basic in action.flag:
+                ability_code += "A"
             elif ActionFlag.skill in action.flag:
-                cmd += "E"
+                ability_code += "E"
+            elif ActionFlag.ult in action.flag:
+                ability_code += "Q"
             elif isinstance(action, UltActivate):
-                cmd += str(action.unit.team.units.index(action.unit) + 1)
+                ability_code += str(action.unit.team.units.index(action.unit) + 1)
             if action.main_target is not None:
-                cmd += str(action.main_target.team.units.index(action.main_target) + 1)
-            cmd_dict[cmd] = action
+                target = str(action.main_target.team.units.index(action.main_target) + 1)
+            else:
+                target = ""
+            extra_index = 1
+            while True:
+                if extra_index > 1:
+                    new_ac = ability_code + str(extra_index)
+                else:
+                    new_ac = ability_code
+                if new_ac not in code_target_action:
+                    ability_code = new_ac
+                    code_target_action[ability_code] = {}
+                    break
+                if target not in code_target_action[ability_code]:
+                    break
+                extra_index += 1
+            code_target_action[ability_code][target] = action
+        cmd_dict: dict[str, Action | None] = {}
+        for code, target in code_target_action.items():
+            if len(target) == 1:
+                cmd_dict[code] = list(target.values())[0]
+                continue
+            for index, action in target.items():
+                cmd_dict[code + index] = action
         if allow_skip:
             cmd_dict["X"] = None
-        print(*cmd_dict.keys())
         while True:
-            cmd = input("Input Command: ").upper()
+            cmd = input(f"Input Command ({'|'.join(cmd_dict.keys())}): ").upper()
             if cmd in cmd_dict:
                 break
             print("Invalid Command!")
@@ -101,8 +123,8 @@ cg1 = ConsoleController()
 b1 = Battle()
 t1 = Team(b1)
 t2 = Team(b1)
-t1.add()
 t2.add()
+t1.add()
 for i in range(4):
     qq = Qingque(t1)
     qq.name += f"-{i+1}"

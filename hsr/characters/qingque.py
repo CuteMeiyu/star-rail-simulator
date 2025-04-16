@@ -4,7 +4,7 @@ from game.action import Action, ActionFlag, ActionProvider, WeakAction
 from game.buff import Buff, TickType
 from game.combat import EventBattleStart, EventTurn, Mod, Team, Unit
 from game.event import listen
-from game.multipier import Damage, DamageFlag, EventDamage
+from game.multipier import DamageFlag, EventDamage, cost_energy, deal_damage, regenerate_energy
 from game.source import Source
 from game.stats import *
 
@@ -75,10 +75,10 @@ class Passive(Indicator):
     def is_win(self):
         return len(self.tiles) > 0 and self.tiles.count(self.tiles[0]) == 4
 
-    def draw(self, n=1, pool: list[str] | None = None):
+    def draw(self, n=1, pool: list[str] | None = None, trigger_e2=True):
         assert isinstance(self.unit, Character)
-        if self.unit.check_eidolon(2):
-            self.unit.regenerate_energy(self, 1, True)
+        if self.unit.check_eidolon(2) and trigger_e2:
+            regenerate_energy(self, self.unit, 1, True)
         if pool is None:
             pool = self.pool
         self.performed = False
@@ -97,7 +97,7 @@ class Passive(Indicator):
         self.tiles.clear()
 
     def cheat(self):
-        self.draw(4, ["F"])
+        self.draw(6, ["F"], False)
 
     def on_turn_start(self, event: EventTurn):
         if event.unit.team is not self.unit.team:
@@ -120,7 +120,7 @@ class Passive(Indicator):
 
     def on_damage(self, event: EventDamage):
         assert isinstance(self.unit, Character)
-        if event.damage.damage_calculator.unit is not self.unit:
+        if event.damage.unit is not self.unit:
             return
         if not isinstance(event.damage.source, Action):
             return
@@ -128,7 +128,7 @@ class Passive(Indicator):
             return
         if not self.unit.check_eidolon(1):
             return
-        event.damage.damage_calculator.source_stats += Stats(DMG_Boost(0.1))
+        event.damage.source_stats += Stats(DMG_Boost(0.1))
 
     def string(self):
         return "".join(self.tiles)
@@ -148,8 +148,8 @@ class Basic(Action):
         if passive is not None:
             passive.pop()
         self.add_target(self.main_target)
-        Damage(self, self.unit, self.main_target, self.scale, 10, DamageFlag.basic, CombatType.quantum).deal()
-        self.unit.regenerate_energy(self, 20, True)
+        deal_damage(self, self.unit, self.main_target, self.scale, 10, DamageFlag.basic, ElementFlag.quantum)
+        regenerate_energy(self, self.unit, 20, True)
         if self.unit.get_mod(AutarkyBuff):
             Autarky(self, self.unit, self.main_target).chain()
 
@@ -184,10 +184,10 @@ class EnhausedBasic(Action):
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
-        Damage(self, self.unit, self.main_target, self.main_scale, 20, DamageFlag.basic, CombatType.quantum).deal()
+        deal_damage(self, self.unit, self.main_target, self.main_scale, 20, DamageFlag.basic, ElementFlag.quantum)
         for target in self.minor_targets:
-            Damage(self, self.unit, target, self.minor_scale, 10, DamageFlag.basic, CombatType.quantum).deal()
-        self.unit.regenerate_energy(self, 20, True)
+            deal_damage(self, self.unit, target, self.minor_scale, 10, DamageFlag.basic, ElementFlag.quantum)
+        regenerate_energy(self, self.unit, 20, True)
         hidden_hand = self.unit.get_mod(HiddenHand)
         if hidden_hand is not None:
             hidden_hand.remove()
@@ -240,7 +240,7 @@ class Autarky(Action):
     def run(self):
         assert self.main_target is not None
         self.add_target(self.main_target)
-        Damage(self, self.unit, self.main_target, self.bind.scale, 10, DamageFlag.follow_up, CombatType.quantum).deal()
+        deal_damage(self, self.unit, self.main_target, self.bind.scale, 10, DamageFlag.follow_up, ElementFlag.quantum)
 
 
 class EnhausedAutarky(Action):
@@ -257,9 +257,9 @@ class EnhausedAutarky(Action):
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
-        Damage(self, self.unit, self.main_target, self.bind.main_scale, 20, DamageFlag.follow_up, CombatType.quantum).deal()
+        deal_damage(self, self.unit, self.main_target, self.bind.main_scale, 20, DamageFlag.follow_up, ElementFlag.quantum)
         for target in self.minor_targets:
-            Damage(self, self.unit, target, self.bind.minor_scale, 10, DamageFlag.follow_up, CombatType.quantum).deal()
+            deal_damage(self, self.unit, target, self.bind.minor_scale, 10, DamageFlag.follow_up, ElementFlag.quantum)
 
 
 class Skill(Action):
@@ -297,12 +297,12 @@ class Ult(Action):
 
     def run(self):
         assert isinstance(self.unit, Character)
-        self.unit.status[Energy, self] -= 140
+        cost_energy(self, self.unit, 140)
         for enemy in self.unit.select_enemies():
             self.add_target(enemy)
         for target in self.targets:
-            Damage(self, self.unit, target, self.scale, 20, DamageFlag.ult, CombatType.quantum).deal()
-        self.unit.regenerate_energy(self, 5, True)
+            deal_damage(self, self.unit, target, self.scale, 20, DamageFlag.ult, ElementFlag.quantum)
+        regenerate_energy(self, self.unit, 5, True)
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.cheat()

@@ -14,17 +14,6 @@ _T = TypeVar("_T")
 
 
 @dataclass
-class EventDead(Event):
-    unit: "Unit"
-
-
-@dataclass
-class EventRevive(Event):
-    unit: "Unit"
-    source: Source | None
-
-
-@dataclass
 class EventTurn(Event):
     unit: "Unit"
 
@@ -49,27 +38,6 @@ class EventNodeStart(Event):
 class EventNodeEnd(Event):
     battle: "Battle"
     node: Node
-
-
-@dataclass
-class EventHPChange(Event):
-    source: Source | None
-    unit: "Unit"
-    amount: float
-
-
-@dataclass
-class EventEnergyChange(Event):
-    source: Source | None
-    unit: "Unit"
-    amount: float
-
-
-@dataclass
-class EventToughnessChange(Event):
-    source: Source | None
-    unit: "Unit"
-    amount: float
 
 
 @dataclass
@@ -116,41 +84,6 @@ class Mod(Source):
 _T_Mod = TypeVar("_T_Mod", bound=Mod)
 
 
-class Death(Node, Source):
-    def __init__(self, source: Source | None, unit: "Unit", priority=0) -> None:
-        super().__init__(priority)
-        Source.__init__(self, source)
-        self.unit = unit
-
-    def run(self):
-        self.unit.status[Alive] = False
-        trigger(EventDead(self.unit))
-
-
-class ReviveNode(Node, Source):
-    def __init__(self, source: Source | None, unit: "Unit", hp_percent: float, priority=0) -> None:
-        super().__init__(priority)
-        Source.__init__(self, source)
-        self.unit = unit
-        self.hp_percent = hp_percent
-
-    def run(self):
-        self.unit.status[Alive] = True
-        self.unit.status[HP] = self.unit.stats[HP] * self.hp_percent
-        trigger(EventRevive(self.unit, self.source))
-
-
-class DeathProtection(Mod):
-    def __init__(self, source: Source | None, unit: "Unit", count=1, priority=0) -> None:
-        super().__init__(source, unit, priority)
-        self.count = count
-
-    def protect(self):
-        self.count -= 1
-        if self.count <= 0:
-            self.remove()
-
-
 class StatusWrapper:
     def __init__(self, unit: "Unit", status: Status) -> None:
         self._unit_ref = ref(unit)
@@ -189,6 +122,10 @@ class Unit(Runner, Source):
         self.status = StatusWrapper(self, Status({HP: stats[HP], Alive: True}))
         self.team = team
         self.mods: list[Mod] = []
+
+    @property
+    def battle(self):
+        return self.team.battle
 
     @property
     def selectable(self):

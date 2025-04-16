@@ -28,6 +28,7 @@ class Priority:
     class Event:
         ## Negative
         first = auto_negative()
+        status_cap = auto_negative()
 
         ## Positive
         last = auto_positive()

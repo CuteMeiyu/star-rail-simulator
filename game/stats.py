@@ -23,6 +23,17 @@ class ElementFlag(_FlexFlag):
     imaginary: "ElementFlag"
 
 
+class PathFlag(_FlexFlag):
+    hunt: "PathFlag"
+    erudition: "PathFlag"
+    harmony: "PathFlag"
+    nihility: "PathFlag"
+    remembrance: "PathFlag"
+    destruction: "PathFlag"
+    abundance: "PathFlag"
+    preservation: "PathFlag"
+
+
 class Stat(_Generic[_T]):
     def __init__(self, flag: _FlexFlag | _MixFlag | None = None) -> None:
         if flag is None:
@@ -212,50 +223,43 @@ class DMG_Mitigation(Stat[float]):
         return 1 - self.value
 
 
-class _GroupStat(Stat[tuple[_T, ...]], _Generic[_T]):
-    def __init__(self, *value: _T, flag: _FlexFlag | _MixFlag | None = None):
-        self.value = set(value)
-        super().__init__(flag)
+_T_FlexFlag = _TypeVar("_T_FlexFlag", bound=_FlexFlag)
 
-    def __iadd__(self, other: _Self):
+
+class _FlagStat(Stat[_T_FlexFlag], _Generic[_T_FlexFlag]):
+    flag_type: type[_T_FlexFlag]
+
+    def __init__(self, value: _T_FlexFlag | None = None, flag: _FlexFlag | _MixFlag | None = None) -> None:
+        super().__init__(flag)
+        if value is not None:
+            self.value = value
+        else:
+            self.value = self.flag_type()
+
+    def __init_subclass__(cls, flag_type: type[_T_FlexFlag]) -> None:
+        cls.flag_type = flag_type
+        return super().__init_subclass__()
+
+    def __iadd__(self, other: _Self) -> _Self:
         self.value |= other.value
         return self
 
-    def get_value(self):
-        return tuple(self.value)
+    def has_intersection(self, flag: _T_FlexFlag):
+        return self.value.value & flag.value > 0
+
+    def get_value(self) -> _T_FlexFlag:
+        return self.value
 
 
-class CombatType(_StrEnum):
-    physical = "Physical"
-    fire = "Fire"
-    lightning = "Lightning"
-    wind = "Wind"
-    ice = "Ice"
-    quantum = "Quantum"
-    imaginary = "Imaginary"
-    none = "None"
-
-
-class Path(_StrEnum):
-    destruction = "Destruction"
-    preservation = "Preservation"
-    hunt = "The Hunt"
-    erudition = "Erudition"
-    nihility = "Nihility"
-    harmony = "Harmony"
-    abundance = "Abundance"
-    remembrance = "Remembrance"
-
-
-class Weakness(_GroupStat[CombatType]):
+class Weakness(_FlagStat[ElementFlag], flag_type=ElementFlag):
     pass
 
 
-class Paths(_GroupStat[Path]):
+class Path(_FlagStat[PathFlag], flag_type=PathFlag):
     pass
 
 
-class CombatTypes(_GroupStat[CombatType]):
+class CombatType(_FlagStat[ElementFlag], flag_type=ElementFlag):
     pass
 
 
