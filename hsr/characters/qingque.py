@@ -1,15 +1,18 @@
 import random
 
 from game.action import Action, ActionFlag, ActionProvider, WeakAction
-from game.buff import Buff, TickType
 from game.combat import EventBattleStart, EventTurn, Mod, Team, Unit
 from game.event import listen
 from game.source import Source
 from game.stats import *
-from game.statusmanager import DamageFlag, EventDamage, cost_energy, deal_damage, regenerate_energy
 
+from ..buff import Buff, TickType
 from ..data.characters import qingque as data
-from ..hsr import Character, EventUnitReady, Indicator, StatusIndicator, Turn, UltActivator
+from ..events import EventDamage
+from ..statusmanager import DamageFlag, deal_damage, regenerate_energy
+from ..turn import EventUnitReady, Turn
+from ..ult import UltActivator
+from ..units import Character
 
 
 class Qingque(Character):
@@ -27,8 +30,6 @@ class Qingque(Character):
         if stats is None:
             stats = data.base_stats.deepcopy()
         super().__init__("Qingque", "QQ", stats, team, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_level)
-        StatusIndicator(self, HP).add()
-        StatusIndicator(self, Energy).add()
         Passive(self).add()
         BasicSkillProvider(self).add()
         UltActivator(self, UltProvider(self)).add()
@@ -36,7 +37,7 @@ class Qingque(Character):
 
 class HiddenHand(Buff):
     def __init__(self, source: Source | None, unit: Character) -> None:
-        super().__init__(source, "Hidden Hand", unit, 1, BuffFlag(), TickType.end)
+        super().__init__(source, "Hidden Hand", unit, 1, TickType.end)
         self.stats = Stats(ATK(increase=data.talent_atk_boost[unit.talent_level - 1]))
 
     def add(self):
@@ -53,7 +54,7 @@ class HiddenHandAnimation(WeakAction):
         super().__init__("Hidden Hand", unit)
 
 
-class Passive(Indicator):
+class Passive(Mod):
     def __init__(self, unit: Character) -> None:
         super().__init__(unit, unit)
         self.tiles = []
@@ -130,9 +131,6 @@ class Passive(Indicator):
             return
         event.damage.source_stats += Stats(DMG_Boost(0.1))
 
-    def string(self):
-        return "".join(self.tiles)
-
 
 class Basic(Action):
     def __init__(self, unit: Character, target: Unit) -> None:
@@ -156,7 +154,7 @@ class Basic(Action):
 
 class WinningHand(Buff):
     def __init__(self, source: Source | None, unit: Unit) -> None:
-        super().__init__(source, "Winning Hand", unit, 1, BuffFlag(), TickType.start_end)
+        super().__init__(source, "Winning Hand", unit, 1, TickType.start_end)
         self.stats = Stats(SPD(increase=0.1))
 
     def add(self):
@@ -201,7 +199,7 @@ class EnhausedBasic(Action):
 
 class AScoopOfMoon(Buff):
     def __init__(self, skill: "Skill", unit: Unit) -> None:
-        super().__init__(skill, "A Scoop of Moon", unit, 1, BuffFlag(), TickType.end, max_stack=4)
+        super().__init__(skill, "A Scoop of Moon", unit, 1, TickType.end, max_stack=4)
         self.skill = skill
         self.dmg_boost = DMG_Boost(skill.dmg_boost)
         self.stats = Stats(self.dmg_boost)
@@ -220,12 +218,14 @@ class AScoopOfMoon(Buff):
 
 
 class ExtraTurn(Turn):
-    pass
+    def __init__(self, unit: Unit) -> None:
+        super().__init__(unit)
+        self.name = "Extra Turn"
 
 
 class AutarkyBuff(Buff):
     def __init__(self, source: Source | None, unit: Unit) -> None:
-        super().__init__(source, "Autarky", unit, 1, BuffFlag(), TickType.end, False)
+        super().__init__(source, "Autarky", unit, 1, TickType.end, False)
 
 
 class Autarky(Action):
@@ -297,7 +297,7 @@ class Ult(Action):
 
     def run(self):
         assert isinstance(self.unit, Character)
-        cost_energy(self, self.unit, 140)
+        self.unit.status[Energy, self] -= 140
         for enemy in self.unit.select_enemies():
             self.add_target(enemy)
         for target in self.targets:

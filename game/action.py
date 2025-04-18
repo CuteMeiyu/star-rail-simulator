@@ -4,7 +4,7 @@ from typing import Any
 from weakref import ref
 
 from .chain import Node
-from .combat import EventNodeEnd, EventNodeStart, Mod, Team, Unit
+from .combat import EventNodeEnd, EventNodeStart, Mod, Unit
 from .event import Event, listen, trigger
 from .flexflag import FlexFlag
 from .source import Source
@@ -136,14 +136,14 @@ class ActionSupressor(Mod):
         return True
 
 
-class ControllerGroup:
+class Controller:
     def choose_action(self, actions: list[Action], allow_skip=False) -> Action | None: ...
 
 
-class Controller(Mod):
-    def __init__(self, group: ControllerGroup, unit: Unit, priority=0) -> None:
+class ActionSelector(Mod):
+    def __init__(self, group: Controller, unit: Unit, priority=0) -> None:
         super().__init__(None, unit, priority)
-        self.group = group
+        self.controller = group
 
 
 def _on_node_start(event: EventNodeStart):

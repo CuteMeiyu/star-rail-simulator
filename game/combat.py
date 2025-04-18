@@ -81,6 +81,11 @@ class Mod(Source):
         return ""
 
 
+class SourcelessMod(Mod):
+    def __init__(self, unit: "Unit", priority=0) -> None:
+        super().__init__(None, unit, priority)
+
+
 _T_Mod = TypeVar("_T_Mod", bound=Mod)
 
 

@@ -165,33 +165,33 @@ class WeaknessIgnore(_SimpleStat):
     pass
 
 
-class BuffFlag(_FlexFlag):
-    bleed: "BuffFlag"
-    burn: "BuffFlag"
-    shock: "BuffFlag"
-    wind_shear: "BuffFlag"
-    frozen: "BuffFlag"
-    entanglement: "BuffFlag"
-    imprisonment: "BuffFlag"
-    control: "BuffFlag"
-    dot: "BuffFlag"
+class DebuffFlag(_FlexFlag):
+    bleed: "DebuffFlag"
+    burn: "DebuffFlag"
+    shock: "DebuffFlag"
+    wind_shear: "DebuffFlag"
+    frozen: "DebuffFlag"
+    entanglement: "DebuffFlag"
+    imprisonment: "DebuffFlag"
+    control: "DebuffFlag"
+    dot: "DebuffFlag"
 
 
-BuffFlag.frozen |= BuffFlag.control
-BuffFlag.entanglement |= BuffFlag.control
-BuffFlag.imprisonment |= BuffFlag.control
-BuffFlag.bleed |= BuffFlag.dot
-BuffFlag.burn |= BuffFlag.dot
-BuffFlag.shock |= BuffFlag.dot
-BuffFlag.wind_shear |= BuffFlag.dot
+DebuffFlag.frozen |= DebuffFlag.control
+DebuffFlag.entanglement |= DebuffFlag.control
+DebuffFlag.imprisonment |= DebuffFlag.control
+DebuffFlag.bleed |= DebuffFlag.dot
+DebuffFlag.burn |= DebuffFlag.dot
+DebuffFlag.shock |= DebuffFlag.dot
+DebuffFlag.wind_shear |= DebuffFlag.dot
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, buff_flag: BuffFlag | None = None) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, buff_flag: DebuffFlag | None = None) -> None:
         self.value = value
         self.multipiers: dict[int, float] = {}
         if buff_flag is None:
-            self.buff_flag = BuffFlag()
+            self.buff_flag = DebuffFlag()
         else:
             self.buff_flag = buff_flag
         super().__init__(flag)

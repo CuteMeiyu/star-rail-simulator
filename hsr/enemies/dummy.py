@@ -1,12 +1,11 @@
 import random
 
-from game.action import Action, ActionFlag, ActionProvider, ControllerGroup
+from game.action import Action, ActionFlag, ActionProvider
 from game.combat import Team, Unit
-from game.source import Source
 from game.stats import *
-from game.statusmanager import DamageFlag, deal_damage, regenerate_energy
 
-from ..hsr import Enemy, StatusIndicator
+from ..statusmanager import DamageFlag, deal_damage, regenerate_energy
+from ..units import Enemy
 
 
 class Dummy(Enemy):
@@ -23,14 +22,12 @@ class Dummy(Enemy):
             ),
             team,
         )
-        StatusIndicator(self, HP).add()
-        StatusIndicator(self, Toughness).add()
         AbilityProvider(self).add()
 
 
 class A1(Action):
     def __init__(self, unit: Unit) -> None:
-        super().__init__("Attack", unit, ActionFlag.attack | ActionFlag.single)
+        super().__init__("A1", unit, ActionFlag.attack | ActionFlag.single)
 
     def run(self):
         enemies = self.unit.select_enemies()

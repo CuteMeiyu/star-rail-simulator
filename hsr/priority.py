@@ -26,9 +26,17 @@ class Priority:
         turn = auto_positive()
 
     class Event:
-        ## Negative
+        # Negative
         first = auto_negative()
         status_cap = auto_negative()
 
-        ## Positive
+        # Positive
         last = auto_positive()
+
+    @staticmethod
+    def auto_positive():
+        return auto_positive()
+
+    @staticmethod
+    def auto_negative():
+        return auto_negative()

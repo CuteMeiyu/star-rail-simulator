@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
-from .combat import EventTurn, EventTurnEnd, Mod, Unit
-from .event import Event, listen, trigger
-from .source import Source
-from .stats import *
+from game.combat import EventTurn, EventTurnEnd, Mod, Unit
+from game.event import Event, listen, trigger
+from game.source import Source
+from game.stats import *
 
 
 class TickType(IntEnum):
@@ -36,16 +36,13 @@ class EventBuffDispel(Event):
 
 
 class Buff(Mod):
-    def __init__(
-        self, source: Source | None, name: str, unit: Unit, duration: int, flag: BuffFlag, tick_type: TickType, dispelable=True, max_stack=0, priority=0
-    ) -> None:
+    def __init__(self, source: Source | None, name: str, unit: Unit, duration: int, tick_type: TickType, dispelable=True, max_stack=0, priority=0) -> None:
         super().__init__(source, unit, priority)
         self._keep_ref = source
         self.name = name
         self.tick_type = tick_type
         self.started = False
         self.duration = duration
-        self.flag = flag
         self.max_stack = max_stack
         self.stacks = 0
         self.dispelable = dispelable

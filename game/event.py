@@ -1,17 +1,21 @@
 from bisect import insort_right
-from typing import Any, Callable, TypeVar
+from types import UnionType
+from typing import Any, Callable, TypeVar, overload
 
 _T = TypeVar("_T")
 
 
 class Listener:
-    def __init__(self, event_type: type[_T], callback: Callable[[_T], Any], priority=0) -> None:
+    def __init__(self, event_type: type[_T] | UnionType, callback: Callable, priority=0) -> None:
         self.event_type = event_type
         self.callback = callback
         self.priority = priority
 
+    def add(self):
+        insort_right(listeners, self, key=lambda x: x.priority)
+
     def remove(self):
-        remove_listener(self)
+        listeners.remove(self)
 
 
 class Event:
@@ -22,18 +26,16 @@ class Event:
 listeners: list[Listener] = []
 
 
-def listen(event_type: type[_T], callback: Callable[[_T], Any], priority=0) -> Listener:
+@overload
+def listen(event_type: type[_T], callback: Callable[[_T], Any], priority=0) -> Listener: ...
+@overload
+def listen(event_type: UnionType, callback: Callable, priority=0) -> Listener: ...
+
+
+def listen(event_type: type[_T] | UnionType, callback: Callable[[_T], Any] | Callable, priority=0) -> Listener:
     listener = Listener(event_type, callback, priority)
-    add_listener(listener)
+    listener.add()
     return listener
-
-
-def add_listener(listener: Listener):
-    insort_right(listeners, listener, key=lambda x: x.priority)
-
-
-def remove_listener(listener: Listener):
-    listeners.remove(listener)
 
 
 def trigger(event: Event):
