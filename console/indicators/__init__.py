@@ -3,7 +3,7 @@ from game.stats import *
 from hsr.characters import Qingque
 
 from ..console import NameIndicator, StatusSuffix, SuffixIndicator
-from .qingque import TileSuffix as QQSuffix
+from . import qingque
 
 
 def init_indicators(unit: Unit):
@@ -15,4 +15,4 @@ def init_indicators(unit: Unit):
     if unit.stats[Toughness] > 0:
         StatusSuffix(unit, Toughness).add()
     if isinstance(unit, Qingque):
-        QQSuffix(unit).add()
+        qingque.init(unit)

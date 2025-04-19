@@ -21,7 +21,7 @@ class NameIndicator(Indicator):
 
 class SuffixIndicator(Indicator):
     def decorate(self, string: str) -> str:
-        return f"{string}({'|'.join(suffix.string() for suffix in self.unit.get_mods(Suffix) if len(suffix.string()) > 0)})"
+        return f"{string}({'|'.join(x for suffix in self.unit.get_mods(Suffix) if len(x := suffix.string()) > 0)})"
 
 
 class ActorIndicator(Indicator):
@@ -106,9 +106,10 @@ class StatusSuffix(Suffix):
         self.previous = unit.status[stat_type]
 
     def string(self):
-        if not math.isclose(self.previous, self.unit.status[self.stat_type]):
-            result = f"{int(self.previous)}{self.unit.status[self.stat_type]-self.previous:+.0f}"
+        current = self.unit.status[self.stat_type]
+        if not math.isclose(self.previous, current):
+            result = f"{current:.0f}({current-self.previous:+.0f})"
         else:
-            result = str(int(self.unit.status[self.stat_type]))
-        self.previous = self.unit.status[self.stat_type]
+            result = str(int(current))
+        self.previous = current
         return result

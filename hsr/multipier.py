@@ -1,6 +1,5 @@
 import math
 from typing import Generic, TypeVar
-from weakref import ref
 
 
 def clamp(value: float, lower_bound: float, upper_bound: float):
@@ -11,16 +10,7 @@ _T_Calculator = TypeVar("_T_Calculator", bound="Calculator")
 
 
 class Multipier(Generic[_T_Calculator]):
-    def __init__(self, calculator: _T_Calculator):
-        self._calculator_ref = ref(calculator)
-
-    @property
-    def calculator(self) -> _T_Calculator:
-        calculator = self._calculator_ref()
-        assert calculator is not None
-        return calculator
-
-    def get(self) -> float:
+    def get(self, calculator: _T_Calculator) -> float:
         return 1.0
 
 
@@ -55,6 +45,6 @@ class Calculator:
         self.add_multipier(multipier)
 
     def calc(self):
-        return math.prod(multipier.get() for multipier in self.multipiers)
+        return math.prod(multipier.get(self) for multipier in self.multipiers)
 
     def deal(self): ...

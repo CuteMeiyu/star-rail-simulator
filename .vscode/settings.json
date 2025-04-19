@@ -5,9 +5,9 @@
     },
     "python.analysis.typeCheckingMode": "standard",
     "black-formatter.args": [
-        "-l 160"
+        "-l 200"
     ],
     "isort.args": [
-        "-l 160"
+        "-l 200"
     ],
 }

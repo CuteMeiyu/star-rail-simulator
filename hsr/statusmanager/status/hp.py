@@ -1,11 +1,13 @@
 import random
 from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 from game import Event, Mod, Source, Stat, Stats, Unit, WeakAction, trigger
 from game.stats import *
+from game.stats import ElementFlag
 
+from ...multipier import Calculator, Multipier, clamp
 from ..flags import DamageFlag
-from ..multipier import Calculator, Multipier, clamp
 
 
 @dataclass
@@ -21,13 +23,15 @@ class EventDeath(Event):
 class DeathNode(WeakAction):
     def __init__(self, source: Source | None, unit: Unit, priority=0) -> None:
         super().__init__("Dead", unit, priority)
-        self.source = source
-        self._keep_ref = source
+        self.killer_source = source
 
     def run(self):
         self.unit.status[Alive] = False
         trigger(EventDeath(self))
-        self._keep_ref = None
+        self.killer_source = None
+
+    def condition(self):
+        return True
 
 
 class DeathProtection(Mod):
@@ -40,10 +44,9 @@ class Damage(Calculator, Source):
         source: Source | None,
         unit: Unit,
         target: Unit,
-        scale: float,
         flag: DamageFlag,
         element: ElementFlag,
-        stat_type: type[Stat[float]] = ATK,
+        *multipiers: Multipier,
     ) -> None:
         super().__init__()
         Source.__init__(self, source)
@@ -53,20 +56,15 @@ class Damage(Calculator, Source):
         self.target_stats = Stats()
         self.source_stats += self.unit.stats
         self.target_stats += self.target.stats
-        self.scale = scale
         self.flag = flag
         self.element = element
-        self.stat_type = stat_type
         self.add_multipiers(
-            BaseDamageMultipier(self),
-            CritMultipier(self),
-            DamageBoostMultipier(self),
-            WeakenMultipier(self),
-            DefenseMultipier(self),
-            ResistanceMultipier(self),
-            VulnerabilityMultipier(self),
-            DMGMitigationMultipier(self),
-            BrokenMultipier(self),
+            *multipiers,
+            DefenseMultipier(),
+            ResistanceMultipier(),
+            VulnerabilityMultipier(),
+            DMGMitigationMultipier(),
+            BrokenMultipier(self.target),
         )
 
     def calc(self):
@@ -87,59 +85,76 @@ class Damage(Calculator, Source):
 
 
 class BaseDamageMultipier(Multipier[Damage]):
-    def get(self):
-        return self.calculator.scale * self.calculator.source_stats.get(self.calculator.stat_type)
+    def __init__(self, scale: float, stat_type: type[Stat] = ATK) -> None:
+        super().__init__()
+        self.scale = scale
+        self.stat_type = stat_type
+
+    def get(self, calculator):
+        return self.scale * calculator.source_stats.get(self.stat_type)
 
 
 class CritMultipier(Multipier[Damage]):
-    def __init__(self, calculator: Damage):
-        super().__init__(calculator)
+    def __init__(self):
         self.rng = random.random()
+        self.crit = False
+        """The last calculated result since `get()` called"""
 
-    def is_crit(self):
-        return self.rng < self.calculator.source_stats.get(CRIT_Rate)
-
-    def get(self):
-        return 1.0 + self.calculator.source_stats.get(CRIT_DMG) if self.is_crit() else 1.0
+    def get(self, calculator):
+        if self.rng < calculator.source_stats.get(CRIT_Rate):
+            self.crit = True
+        else:
+            self.crit = False
+        return 1.0 + calculator.source_stats.get(CRIT_DMG) if self.crit else 1.0
 
 
 class DamageBoostMultipier(Multipier[Damage]):
-    def get(self):
-        return 1.0 + self.calculator.source_stats.get(DMG_Boost)
+    def get(self, calculator):
+        return 1.0 + calculator.source_stats.get(DMG_Boost)
 
 
 class WeakenMultipier(Multipier[Damage]):
-    def get(self):
-        return clamp(1.0 - self.calculator.source_stats.get(Weaken), 0.0, 1.0)
+    def get(self, calculator):
+        return clamp(1.0 - calculator.source_stats.get(Weaken), 0.0, 1.0)
 
 
 class DefenseMultipier(Multipier[Damage]):
-    def get(self):
-        with self.calculator.target_stats.temp(Stats(DEF(decrease=self.calculator.source_stats.get(DEF_Ignore)))):
-            return (self.calculator.source_stats.get(Level) * 10.0 + 200.0) / (
-                self.calculator.source_stats.get(Level) * 10.0 + 200.0 + max(0.0, self.calculator.target_stats.get(DEF))
+    def get(self, calculator):
+        with calculator.target_stats.temp(Stats(DEF(decrease=calculator.source_stats.get(DEF_Ignore)))):
+            return (calculator.source_stats.get(Level) * 10.0 + 200.0) / (
+                calculator.source_stats.get(Level) * 10.0 + 200.0 + max(0.0, calculator.target_stats.get(DEF))
             )
 
 
 class ResistanceMultipier(Multipier[Damage]):
-    def get(self):
-        return clamp(1.0 - self.calculator.target_stats.get(DMG_RES) + self.calculator.source_stats.get(RES_PEN), 0.0, 2.0)
+    def get(self, calculator):
+        return clamp(1.0 - calculator.target_stats.get(DMG_RES) + calculator.source_stats.get(RES_PEN), 0.0, 2.0)
 
 
 class VulnerabilityMultipier(Multipier[Damage]):
-    def get(self):
-        return 1.0 + self.calculator.target_stats.get(Vulnerability)
+    def get(self, calculator):
+        return 1.0 + calculator.target_stats.get(Vulnerability)
 
 
 class DMGMitigationMultipier(Multipier[Damage]):
-    def get(self):
-        return max(1.0 - self.calculator.target_stats.get(DMG_Mitigation), 0.0)
+    def get(self, calculator):
+        return max(1.0 - calculator.target_stats.get(DMG_Mitigation), 0.0)
 
 
 class BrokenMultipier(Multipier[Damage]):
-    def __init__(self, calculator: Damage):
-        super().__init__(calculator)
-        self.value = 1.0 if self.calculator.target.status[Toughness] <= 0.0 else 0.9
+    def __init__(self, target: Unit):
+        super().__init__()
+        self.value = 0.9 if target.status[Toughness] > 0 else 1.0
 
-    def get(self):
+    def get(self, calculator):
         return self.value
+
+
+class BreakEffectMultipier(Multipier[Damage]):
+    def get(self, calculator: Damage) -> float:
+        return 1.0 + calculator.source_stats[Break_Effect]
+
+
+class ToughnessMultipier(Multipier[Damage]):
+    def get(self, calculator: Damage) -> float:
+        return (calculator.target_stats[Toughness] + 20.0) * 0.025

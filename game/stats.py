@@ -187,23 +187,23 @@ DebuffFlag.wind_shear |= DebuffFlag.dot
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, buff_flag: DebuffFlag | None = None) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, debuff_flag: DebuffFlag | None = None) -> None:
         self.value = value
         self.multipiers: dict[int, float] = {}
-        if buff_flag is None:
-            self.buff_flag = DebuffFlag()
+        if debuff_flag is None:
+            self.debuff_flag = DebuffFlag()
         else:
-            self.buff_flag = buff_flag
+            self.debuff_flag = debuff_flag
         super().__init__(flag)
 
     def __iadd__(self, other: _Self) -> _Self:
-        if self.buff_flag == other.buff_flag:
+        if self.debuff_flag == other.debuff_flag:
             self.value += other.value
-        elif other.buff_flag in self.buff_flag:
-            if other.buff_flag.value in self.multipiers:
-                self.multipiers[other.buff_flag.value] += other.value
+        elif other.debuff_flag in self.debuff_flag:
+            if other.debuff_flag.value in self.multipiers:
+                self.multipiers[other.debuff_flag.value] += other.value
             else:
-                self.multipiers[other.buff_flag.value] = other.value
+                self.multipiers[other.debuff_flag.value] = other.value
         return self
 
     def get_value(self) -> float:
@@ -289,6 +289,10 @@ class OffField(_IntStat):
 
 
 class OffTimeline(_IntStat):
+    pass
+
+
+class NoQuit(_IntStat):
     pass
 
 

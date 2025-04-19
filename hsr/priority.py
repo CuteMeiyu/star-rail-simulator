@@ -17,9 +17,9 @@ def auto_positive():
 class Priority:
     class Node:
         # Negative
+        death = auto_negative()
         action_end = auto_negative()
         ult_activate = auto_negative()
-        death = auto_negative()
         counter = auto_negative()
 
         # Positive

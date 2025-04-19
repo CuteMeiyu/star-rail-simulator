@@ -8,7 +8,7 @@ from .combat import EventNodeEnd, EventNodeStart, Mod, Unit
 from .event import Event, listen, trigger
 from .flexflag import FlexFlag
 from .source import Source
-from .stats import HP, Alive
+from .stats import *
 
 
 @dataclass
@@ -83,10 +83,9 @@ class Action(Node, Source):
                 yield target
 
     def condition(self):
-        return self.unit.status[Alive]
-
-    def check(self):
-        if not self.condition():
+        if not self.unit.status[Alive]:
+            return False
+        if self.unit.status[Broken]:
             return False
         if any(not asp.check_available(self) for asp in self.unit.get_mods(ActionSupressor)):
             return False

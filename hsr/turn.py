@@ -17,7 +17,7 @@ def get_available_actions(action_providers: list[ActionProvider], over_turn: boo
     for provider in action_providers:
         if provider.over_turn != over_turn:
             continue
-        actions = [action for action in provider.get_available_actions() if action.check()]
+        actions = [action for action in provider.get_available_actions() if action.condition()]
         available_actions += actions
     if over_turn:
         for action in available_actions:
@@ -102,3 +102,6 @@ class OverTurn(WeakAction):
             if action is not None:
                 action.chain()
                 return
+
+    def condition(self):
+        return True

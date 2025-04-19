@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from game import Event, Source, Unit, trigger
 from game.stats import *
 
-from ..multipier import Calculator, Multipier
+from ...multipier import Calculator, Multipier
 
 
 @dataclass
@@ -19,8 +19,8 @@ class EnergyRegenerate(Calculator, Source):
         self.amount = amount
         self.rated = apply_regeneration_rate
         self.add_multipiers(
-            EnergyAmountMultipier(self),
-            EnergyRegenerationRateMultipier(self),
+            EnergyAmountMultipier(),
+            EnergyRegenerationRateMultipier(),
         )
 
     def deal(self):
@@ -30,10 +30,10 @@ class EnergyRegenerate(Calculator, Source):
 
 
 class EnergyAmountMultipier(Multipier[EnergyRegenerate]):
-    def get(self) -> float:
-        return self.calculator.amount
+    def get(self, calculator) -> float:
+        return calculator.amount
 
 
 class EnergyRegenerationRateMultipier(Multipier[EnergyRegenerate]):
-    def get(self) -> float:
-        return 1.0 + self.calculator.unit.stats.get(Energy_Regeneration_Rate) if self.calculator.rated else 1.0
+    def get(self, calculator) -> float:
+        return 1.0 + calculator.unit.stats.get(Energy_Regeneration_Rate) if calculator.rated else 1.0

@@ -1,7 +1,7 @@
 from bisect import insort_right
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 from weakref import ref
 
 from .chain import Chain, Node
@@ -57,6 +57,11 @@ class EventStatusChange(Event, Generic[_T_Stat, _T]):
     stat_type: type[_T_Stat]
     previous: _T
     current: _T
+
+
+@dataclass
+class EventEnterBattle(Event):
+    unit: "Unit"
 
 
 class Mod(Source):
@@ -256,6 +261,12 @@ class Battle:
     def remove_team(self, team: Team):
         self.teams.remove(team)
 
+    def remove_dead_units(self):
+        for team in self.teams:
+            for unit in team.units.copy():
+                if not unit.status[Alive] and not unit.stats[NoQuit]:
+                    unit.remove()
+
     def run_nodes(self):
         for node in self.chain.flush():
             trigger(EventNodeStart(self, node))
@@ -273,7 +284,10 @@ class Battle:
             self.turn_out()
 
     def turn_out(self):
+        self.remove_dead_units()
         runner = self.schedule.current_runner
+        if runner not in self.schedule.runners:
+            return
         self.schedule.turn_out()
         if isinstance(runner, Unit):
             trigger(EventTurnEnd(runner))

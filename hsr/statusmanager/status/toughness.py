@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from game import Event, Source, Stats, Unit, trigger
 from game.stats import *
 
+from ...multipier import Calculator, Multipier
 from ..flags import DamageFlag
-from ..multipier import Calculator, Multipier
 
 
 @dataclass
@@ -26,9 +26,9 @@ class ToughnessDamage(Calculator, Source):
         self.flag = flag
         self.element = element
         self.add_multipiers(
-            BaseToughnessMultipier(self),
-            BreakEfficiencyMultipier(self),
-            WeaknessMultipier(self),
+            BaseToughnessMultipier(),
+            BreakEfficiencyMultipier(),
+            WeaknessMultipier(),
         )
 
     def calc(self):
@@ -45,19 +45,19 @@ class ToughnessDamage(Calculator, Source):
 
 
 class BaseToughnessMultipier(Multipier[ToughnessDamage]):
-    def get(self):
-        return self.calculator.base_amount
+    def get(self, calculator):
+        return calculator.base_amount
 
 
 class BreakEfficiencyMultipier(Multipier[ToughnessDamage]):
-    def get(self):
-        return 1.0 + self.calculator.source_stats.get(Break_Efficiency)
+    def get(self, calculator):
+        return 1.0 + calculator.source_stats.get(Break_Efficiency)
 
 
 class WeaknessMultipier(Multipier[ToughnessDamage]):
-    def get(self):
-        if self.calculator.target_stats.get(WeaknessProtection) > 0:
+    def get(self, calculator):
+        if calculator.target_stats.get(WeaknessProtection) > 0:
             return 0.0
-        if self.calculator.target_stats.get_stat(Weakness).has_intersection(self.calculator.element):
+        if calculator.target_stats.get_stat(Weakness).has_intersection(calculator.element):
             return 1.0
-        return min(self.calculator.source_stats.get(WeaknessIgnore), 1.0)
+        return min(calculator.source_stats.get(WeaknessIgnore), 1.0)
