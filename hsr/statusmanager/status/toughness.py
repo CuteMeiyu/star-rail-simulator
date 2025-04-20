@@ -1,15 +1,44 @@
 from dataclasses import dataclass
 
-from game import Event, Source, Stats, Unit, trigger
+from game import Event, Listener, Mod, Source, Stats, Unit, WeakAction, conditions, trigger
+from game.events import EventTurn
 from game.stats import *
 
 from ...multipier import Calculator, Multipier
+from ...priority import Priority
 from ..flags import DamageFlag
 
 
 @dataclass
 class EventToughnessDamage(Event):
     damage: "ToughnessDamage"
+
+
+@dataclass
+class EventWeaknessBreak(Event):
+    source: Source | None
+    unit: Unit
+
+
+@dataclass
+class EventWeaknessRestore(Event):
+    weakness_restore: "WeaknessRestore"
+
+
+class BreakProtection(Mod):
+    def protect(self): ...
+
+
+class WeaknessRestore(WeakAction):
+    def __init__(self, unit: Unit, percent=1.0, priority=0) -> None:
+        super().__init__("Weakness Restore", unit, priority)
+        self.percent = percent
+        self.remove_condition(conditions.BrokenCondition)
+
+    def run(self):
+        self.unit.status[Broken] = False
+        self.unit.status[Toughness, self] = self.unit.stats[Toughness] * self.percent
+        trigger(EventWeaknessRestore(self))
 
 
 class ToughnessDamage(Calculator, Source):
@@ -39,9 +68,16 @@ class ToughnessDamage(Calculator, Source):
     def deal(self):
         trigger(EventToughnessDamage(self))
         amount = self.calc()
+        if amount <= 0:
+            return
         self.target.status[Toughness, self] -= amount
-        if self.target.status[Toughness] <= 0.0:
-            pass
+        if not self.target.status[Broken] and self.target.status[Toughness] <= 0.0:
+            if protection := self.target.get_mod(BreakProtection):
+                protection.protect()
+            else:
+                self.target.status[Broken] = True
+                self.target.action_delay(2500)
+                trigger(EventWeaknessBreak(self, self.target))
 
 
 class BaseToughnessMultipier(Multipier[ToughnessDamage]):
@@ -61,3 +97,20 @@ class WeaknessMultipier(Multipier[ToughnessDamage]):
         if calculator.target_stats.get_stat(Weakness).has_intersection(calculator.element):
             return 1.0
         return min(calculator.source_stats.get(WeaknessIgnore), 1.0)
+
+
+def _on_turn(event: EventTurn):
+    if not event.unit.status[Broken]:
+        return
+    WeaknessRestore(event.unit).chain()
+
+
+_weakness_restore_listener = Listener(EventTurn, _on_turn, Priority.Event.weakness_restore)
+
+
+def enable_weakness_restore():
+    _weakness_restore_listener.add()
+
+
+def disable_weakness_restore():
+    _weakness_restore_listener.remove()

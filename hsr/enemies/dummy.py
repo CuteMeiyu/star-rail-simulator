@@ -16,11 +16,12 @@ class Dummy(Enemy):
             Stats(
                 ATK(1000),
                 HP(10000),
-                SPD(158),
-                Toughness(120),
+                SPD(120),
+                Toughness(60),
                 Weakness(ElementFlag.quantum | ElementFlag.fire | ElementFlag.lightning),
             ),
             team,
+            True,
         )
         AbilityProvider(self).add()
 

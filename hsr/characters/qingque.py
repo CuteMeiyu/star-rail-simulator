@@ -1,6 +1,6 @@
 import random
 
-from game.action import Action, ActionFlag, ActionProvider, WeakAction
+from game.action import Action, ActionFlag, ActionProvider, MainTargetCondition, WeakAction
 from game.combat import EventBattleStart, EventTurn, Mod, Team, Unit
 from game.event import listen
 from game.source import Source
@@ -220,7 +220,6 @@ class AScoopOfMoon(Buff):
 class ExtraTurn(Turn):
     def __init__(self, unit: Unit) -> None:
         super().__init__(unit)
-        self.name = "Extra Turn"
 
 
 class AutarkyBuff(Buff):
@@ -233,9 +232,7 @@ class Autarky(Action):
         super().__init__("Autarky", unit, ActionFlag.attack | ActionFlag.follow_up | ActionFlag.single)
         self.main_target = target
         self.bind = bind
-
-    def condition(self):
-        return super().condition() and self.main_target is not None and self.main_target.selectable
+        self.add_conditions(MainTargetCondition())
 
     def run(self):
         assert self.main_target is not None
@@ -248,9 +245,7 @@ class EnhausedAutarky(Action):
         super().__init__("Autarky", unit, ActionFlag.attack | ActionFlag.follow_up | ActionFlag.blast)
         self.main_target = target
         self.bind = bind
-
-    def condition(self):
-        return super().condition() and self.main_target is not None and self.main_target.selectable
+        self.add_conditions(MainTargetCondition())
 
     def run(self):
         assert self.main_target is not None

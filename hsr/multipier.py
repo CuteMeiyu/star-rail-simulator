@@ -35,13 +35,14 @@ class Calculator:
         for multipier in multipiers:
             self.add_multipier(multipier)
 
-    def remove_multipier(self, multipier: Multipier):
-        self.multipiers.remove(multipier)
+    def remove_multipier(self, multipier_type: type[Multipier]):
+        if multipier := self.get_multipier(multipier_type):
+            self.multipiers.remove(multipier)
 
     def update_multipier(self, multipier: Multipier):
         old_multipier = self.get_multipier(type(multipier))
         assert old_multipier is not None
-        self.remove_multipier(old_multipier)
+        self.multipiers.remove(old_multipier)
         self.add_multipier(multipier)
 
     def calc(self):

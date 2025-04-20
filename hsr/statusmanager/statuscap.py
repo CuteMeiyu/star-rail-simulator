@@ -1,4 +1,4 @@
-from game import listen
+from game import Listener
 from game.events import EventStatusChange
 
 from ..priority import Priority
@@ -16,7 +16,7 @@ def _on_status_change(event: EventStatusChange):
         event.current = 0.0
 
 
-_listener = listen(EventStatusChange, _on_status_change, Priority.Event.status_cap)
+_listener = Listener(EventStatusChange, _on_status_change, Priority.Event.status_cap)
 
 
 def enable_status_cap():

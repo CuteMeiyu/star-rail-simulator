@@ -40,7 +40,7 @@ class Runner:
         self.runner_data.status = status
 
     def action_delay(self, distance: float, status=Status.DELAYED):
-        self.runner_data.distance -= distance
+        self.runner_data.distance += distance
         self.runner_data.status = status
 
 

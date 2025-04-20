@@ -21,6 +21,7 @@ class Priority:
         action_end = auto_negative()
         ult_activate = auto_negative()
         counter = auto_negative()
+        follow_up = auto_negative()
 
         # Positive
         turn = auto_positive()
@@ -29,6 +30,8 @@ class Priority:
         # Negative
         first = auto_negative()
         status_cap = auto_negative()
+        dot = auto_negative()
+        weakness_restore = auto_negative()
 
         # Positive
         last = auto_positive()

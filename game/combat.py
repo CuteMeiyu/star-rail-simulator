@@ -173,6 +173,15 @@ class Unit(Runner, Source):
         return [enemy for team in self.team.battle.teams if team is not self.team for enemy in team.units]
 
 
+class UnitNode(Node):
+    def __init__(self, unit: Unit, priority=0) -> None:
+        super().__init__(priority)
+        self.unit = unit
+
+    def chain(self, left_most=False):
+        self.unit.battle.chain.add(self, left_most)
+
+
 class Team:
     def __init__(self, battle: "Battle") -> None:
         self.units: list[Unit] = []
@@ -236,8 +245,8 @@ class Team:
 
 
 class BattlePhase(IntEnum):
-    ready = auto()
-    finish = auto()
+    in_turn = auto()
+    out_turn = auto()
 
 
 class Battle:
@@ -247,6 +256,9 @@ class Battle:
         self.chain = Chain()
         self.current_unit: Unit | None = None
         self.started = False
+        self.phase = BattlePhase.in_turn
+        self.end_node: Node | None = None
+        self.is_over_fast: bool = False
 
     def start(self):
         self.started = True
@@ -268,34 +280,47 @@ class Battle:
                     unit.remove()
 
     def run_nodes(self):
-        for node in self.chain.flush():
-            trigger(EventNodeStart(self, node))
-            node.run()
-            trigger(EventNodeEnd(self, node))
+        while True:
+            self.remove_dead_units()
+            if self.is_over():
+                break
+            self.chain.clear_invalid()
+            if self.end_node is not None and self.end_node not in self.chain:
+                self.end_node = None
+                self.turn_out()
+            if len(self.chain) == 0:
+                break
+            with self.chain.next() as node:
+                trigger(EventNodeStart(self, node))
+                node.run()
+                trigger(EventNodeEnd(self, node))
 
     def turn_in(self):
+        self.phase = BattlePhase.in_turn
         while True:
             runner = self.schedule.turn_in()
             if isinstance(runner, Unit):
                 self.current_unit = runner
-                trigger(EventTurn(runner))
-                self.run_nodes()
                 return runner
             self.turn_out()
 
     def turn_out(self):
-        self.remove_dead_units()
+        self.phase = BattlePhase.out_turn
         runner = self.schedule.current_runner
         if runner not in self.schedule.runners:
             return
         self.schedule.turn_out()
-        if isinstance(runner, Unit):
-            trigger(EventTurnEnd(runner))
-            self.run_nodes()
 
     def turn(self):
         while not self.is_over():
-            yield BattlePhase.ready, self.turn_in()
-            self.turn_out()
+            self.turn_in()
             assert self.current_unit is not None
-            yield BattlePhase.finish, self.current_unit
+            trigger(EventTurn(self.current_unit))
+            yield self.current_unit
+            if len(self.chain) > 0:
+                self.end_node = self.chain[-1]
+                self.run_nodes()
+            else:
+                self.turn_out()
+            trigger(EventTurnEnd(self.current_unit))
+            self.run_nodes()

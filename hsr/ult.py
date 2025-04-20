@@ -8,7 +8,6 @@ from .turn import Turn
 class UltExtraTurn(Turn):
     def __init__(self, unit: Unit, *ult_providers: ActionProvider, priority=0) -> None:
         super().__init__(unit, *ult_providers, priority=priority)
-        self.name = "Extra Turn (Ult)"
 
 
 class UltActivate(WeakAction):

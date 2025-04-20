@@ -1,13 +1,12 @@
 from game import Source, Unit
 from game.stats import *
-from game.stats import ElementFlag
 
 from ..buff import Debuff, DebuffFlag, TickType
 from ..multipier import Multipier
 from ..statusmanager import Damage, DamageFlag
 
 
-class DoTFinalDamageMultipier(Multipier[Damage]):
+class DoTPercentMultipier(Multipier[Damage]):
     def __init__(self, percent: float) -> None:
         super().__init__()
         self.percent = percent
@@ -41,4 +40,4 @@ class DoTDebuff(Debuff):
         self.damage_multipiers = multipiers
 
     def dot(self, percent=1.0):
-        Damage(self, self.source_unit, self.unit, self.damage_flag, self.damage_type, *self.damage_multipiers, DoTFinalDamageMultipier(percent)).deal()
+        Damage(self, self.source_unit, self.unit, self.damage_flag, self.damage_type, *self.damage_multipiers, DoTPercentMultipier(percent)).deal()

@@ -1,4 +1,5 @@
 from bisect import insort_left, insort_right
+from contextlib import contextmanager
 
 
 class Node:
@@ -23,19 +24,32 @@ class Chain:
     def __len__(self):
         return len(self.nodes)
 
+    def __contains__(self, node: Node):
+        return node in self.nodes
+
     def add(self, node: Node, left_most=False):
         if left_most:
             insort_left(self.nodes, node, key=lambda x: x.priority)
         else:
             insort_right(self.nodes, node, key=lambda x: x.priority)
 
+    def clear_invalid(self):
+        for node in self.nodes.copy():
+            if not node.condition():
+                self.nodes.remove(node)
+
+    @contextmanager
+    def next(self):
+        self.current_node = self.nodes.pop(0)
+        try:
+            yield self.current_node
+        finally:
+            self.current_node = None
+
     def flush(self):
         while True:
-            for node in self.nodes.copy():
-                if not node.condition():
-                    self.nodes.remove(node)
+            self.clear_invalid()
             if len(self.nodes) == 0:
                 break
-            self.current_node = self.nodes.pop(0)
-            yield self.current_node
-        self.current_node = None
+            with self.next() as node:
+                yield node

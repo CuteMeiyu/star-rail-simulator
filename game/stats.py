@@ -1,7 +1,6 @@
 import math as _math
 from contextlib import contextmanager as _contextmanager
 from copy import deepcopy as _deepcopy
-from enum import StrEnum as _StrEnum
 from typing import Any as _Any
 from typing import Generic as _Generic
 from typing import Self as _Self
@@ -53,7 +52,7 @@ class _ComplexStat(Stat[float]):
         self.decrease = decrease
         super().__init__(flag)
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         if other.flag not in self.flag:
             return self
         self.base += other.base
@@ -99,7 +98,7 @@ class _SimpleStat(Stat[float]):
         self.value = value
         super().__init__(flag)
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         if other.flag not in self.flag:
             return self
         self.value += other.value
@@ -196,7 +195,7 @@ class Effect_RES(Stat[float]):
             self.debuff_flag = debuff_flag
         super().__init__(flag)
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         if self.debuff_flag == other.debuff_flag:
             self.value += other.value
         elif other.debuff_flag in self.debuff_flag:
@@ -215,7 +214,7 @@ class DMG_Mitigation(Stat[float]):
         self.value = max(1 - value, 0)
         super().__init__(flag)
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         self.value *= other.value
         return self
 
@@ -240,7 +239,7 @@ class _FlagStat(Stat[_T_FlexFlag], _Generic[_T_FlexFlag]):
         cls.flag_type = flag_type
         return super().__init_subclass__()
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         self.value |= other.value
         return self
 
@@ -268,7 +267,7 @@ class _IntStat(Stat[int]):
         self.value = value
         super().__init__(flag)
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         self.value += other.value
         return self
 
@@ -307,7 +306,7 @@ class BoolStat(Stat[bool]):
         cls.default = default
         return super().__init_subclass__()
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         self.value = other.value
         return self
 

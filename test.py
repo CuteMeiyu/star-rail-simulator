@@ -1,52 +1,42 @@
 import console
 import game
 import hsr
-from game.events import EventActionEnd, EventNodeStart
+from game.events import EventActionEnd, EventNodeStart, EventTurn, EventTurnEnd
 from game.stats import Energy
 from hsr import characters, enemies
-from hsr.events import EventDamage
 
 
 def node_print(event: EventNodeStart):
-    if isinstance(event.node, game.Action):
-        if isinstance(event.node, (hsr.Turn, hsr.OverTurn)):
-            print(f"{event.node.name}:", event.node.unit.name)
+    if isinstance(event.node, game.UnitNode):
+        print("Node:", event.node.__class__.__name__, event.node.unit.name)
+    elif isinstance(event.node, game.Action):
+        if game.ActionFlag.attack in event.node.flag:
+            pass
         elif isinstance(event.node, game.WeakAction):
-            print("Node:", event.node.name, event.node.unit.name)
-        elif game.ActionFlag.attack in event.node.flag:
-            event.node.context["damage_dict"] = {}
+            print(f"WeakAction:", event.node.name, event.node.unit.name)
         else:
-            print("Action:", event.node.name)
+            print(f"Action:", event.node.name, event.node.unit.name)
     else:
         print("Node:", event.node.__class__.__name__)
 
 
-def damage_print(event: EventActionEnd):
-    if game.ActionFlag.attack in event.action.flag:
-        attack = event.action.name
-        source = event.action.unit.name
-        damage_dict: dict[game.Unit, tuple[float, int]] = event.action.context["damage_dict"]
-        target = ", ".join(f"{target.name}({damage_dict[target][0]:.2f}{"!" if damage_dict[target][1] else ""})" for target in event.action.targets)
-        print(f"Attack: [{attack}] {source} -> {target}")
-
-
-def damage_record(event: EventDamage):
-    damage = event.damage
-    action = damage.source
-    if not isinstance(action, game.Action):
+def attack_print(event: EventActionEnd):
+    if game.ActionFlag.attack not in event.action.flag:
         return
-    crit_multipier = damage.get_multipier(hsr.multipiers.CritMultipier)
-    crit = False if crit_multipier is None else crit_multipier.crit
-    damage_dict: dict[game.Unit, tuple[float, int]] = action.context["damage_dict"]
-    if damage.target not in damage_dict:
-        damage_dict[damage.target] = (damage.calc(), crit)
-    else:
-        s_damage, s_crit = damage_dict[damage.target]
-        damage_dict[damage.target] = (damage.calc() + s_damage, crit + s_crit)
+    print(f"Attack: [{event.action.name}] {event.action.unit.name} -> {', '.join(target.name for target in event.action.targets)}")
 
 
 def over_turn_action_select(event: EventActionEnd):
     hsr.OverTurn(event.action.unit).chain()
+
+
+def actor_indicator_add(event: EventTurn):
+    console.ActorIndicator(event.unit).add()
+
+
+def actor_indicator_remove(event: EventTurnEnd):
+    if (indicator := event.unit.get_mod(console.ActorIndicator)) is not None:
+        indicator.remove()
 
 
 def main():
@@ -69,19 +59,14 @@ def main():
         dm.name += f"-{i+1}"
         dm.add()
     battle1.start()
-    for phase, unit in battle1.turn():
-        if phase == game.BattlePhase.ready:
-            console.ActorIndicator(unit).add()
-            hsr.Turn(unit).chain()
-            battle1.run_nodes()
-            indicator = unit.get_mod(console.ActorIndicator)
-            if indicator is not None:
-                indicator.remove()
-            print()
+    for unit in battle1.turn():
+        hsr.Turn(unit).chain()
 
 
+# game.listen(game.Event, event_print)
 game.listen(EventNodeStart, node_print)
-game.listen(EventDamage, damage_record, hsr.Priority.Event.last)
-game.listen(EventActionEnd, damage_print, hsr.Priority.Event.first)
+game.listen(EventActionEnd, attack_print)
 game.listen(EventActionEnd, over_turn_action_select, hsr.Priority.Event.first)
+game.listen(EventTurn, actor_indicator_add)
+game.listen(EventTurnEnd, actor_indicator_remove)
 main()

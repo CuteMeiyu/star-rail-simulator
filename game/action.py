@@ -4,7 +4,7 @@ from typing import Any
 from weakref import ref
 
 from .chain import Node
-from .combat import EventNodeEnd, EventNodeStart, Mod, Unit
+from .combat import EventNodeEnd, EventNodeStart, Mod, Unit, UnitNode
 from .event import Event, listen, trigger
 from .flexflag import FlexFlag
 from .source import Source
@@ -52,6 +52,11 @@ class Action(Node, Source):
         self.context: dict[str, Any] = {}
         self._main_target_ref = None
         self._targets_ref: list[ref[Unit]] = []
+        self.conditions: list[ActionCondition] = [
+            AliveCondition(),
+            BrokenCondition(),
+            SupressorCondition(),
+        ]
 
     @property
     def unit(self):
@@ -83,13 +88,15 @@ class Action(Node, Source):
                 yield target
 
     def condition(self):
-        if not self.unit.status[Alive]:
-            return False
-        if self.unit.status[Broken]:
-            return False
-        if any(not asp.check_available(self) for asp in self.unit.get_mods(ActionSupressor)):
-            return False
-        return True
+        return all(condition.check(self) for condition in self.conditions)
+
+    def add_conditions(self, *conditions: "ActionCondition"):
+        self.conditions.extend(conditions)
+
+    def remove_condition(self, condition_type: type["ActionCondition"]):
+        for condition in self.conditions.copy():
+            if isinstance(condition, condition_type):
+                self.conditions.remove(condition)
 
     def add_target(self, target: Unit):
         if target in self.targets:
@@ -133,6 +140,30 @@ class ActionProvider(Mod):
 class ActionSupressor(Mod):
     def check_available(self, action: Action):
         return True
+
+
+class ActionCondition:
+    def check(self, action: Action) -> bool: ...
+
+
+class AliveCondition(ActionCondition):
+    def check(self, action: Action) -> bool:
+        return action.unit.status[Alive]
+
+
+class BrokenCondition(ActionCondition):
+    def check(self, action: Action):
+        return not action.unit.status[Broken]
+
+
+class SupressorCondition(ActionCondition):
+    def check(self, action: Action) -> bool:
+        return all(asp.check_available(action) for asp in action.unit.get_mods(ActionSupressor))
+
+
+class MainTargetCondition(ActionCondition):
+    def check(self, action: Action) -> bool:
+        return action.main_target is not None and action.main_target.selectable
 
 
 class Controller:

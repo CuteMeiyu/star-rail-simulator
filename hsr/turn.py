@@ -1,15 +1,15 @@
 import random
 from dataclasses import dataclass
 
-from game import Action, ActionProvider, ActionSelector, Controller, Event, Unit, WeakAction, trigger
+from game import Action, ActionProvider, ActionSelector, Controller, Event, Unit, UnitNode, WeakAction, trigger
 
 from .priority import Priority
 
 
 @dataclass
 class EventUnitReady(Event):
-    unit: Unit
     turn: "Turn"
+    unit: Unit
 
 
 def get_available_actions(action_providers: list[ActionProvider], over_turn: bool):
@@ -25,13 +25,19 @@ def get_available_actions(action_providers: list[ActionProvider], over_turn: boo
     return available_actions
 
 
-class Turn(WeakAction):
+class Turn(UnitNode):
     def __init__(self, unit: Unit, *specific_providers: ActionProvider, priority=Priority.Node.turn) -> None:
-        super().__init__("Turn", unit, priority)
+        super().__init__(unit, priority)
         self.specific_providers = list(specific_providers)
 
     def run(self):
-        trigger(EventUnitReady(self.unit, self))
+        if len(self.specific_providers) > 0:
+            available_actions = get_available_actions(self.specific_providers, False)
+        else:
+            available_actions = get_available_actions(self.unit.get_mods(ActionProvider), False)
+        if len(available_actions) == 0:
+            return
+        trigger(EventUnitReady(self, self.unit))
         chain = self.unit.team.battle.chain
         if len(chain) > 0 and chain[0].priority < self.priority:
             self.chain(True)
@@ -39,10 +45,6 @@ class Turn(WeakAction):
         while True:
             selector = self.unit.get_mod(ActionSelector)
             controller = None if selector is None else selector.controller
-            if len(self.specific_providers) > 0:
-                available_actions = get_available_actions(self.specific_providers, False)
-            else:
-                available_actions = get_available_actions(self.unit.get_mods(ActionProvider), False)
             controller_action_dict: dict[Controller | None, list[Action]] = {controller: available_actions}
             for ally in self.unit.team.units:
                 ally_selector = ally.get_mod(ActionSelector)
@@ -77,9 +79,9 @@ class Turn(WeakAction):
             break
 
 
-class OverTurn(WeakAction):
+class OverTurn(UnitNode):
     def __init__(self, unit: Unit) -> None:
-        super().__init__("Action End", unit, Priority.Node.action_end)
+        super().__init__(unit, Priority.Node.action_end)
 
     def run(self):
         controller_actions_dict: dict[Controller | None, list[Action]] = {}
@@ -102,6 +104,3 @@ class OverTurn(WeakAction):
             if action is not None:
                 action.chain()
                 return
-
-    def condition(self):
-        return True

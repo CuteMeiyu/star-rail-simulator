@@ -2,11 +2,12 @@ import random
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from game import Event, Mod, Source, Stat, Stats, Unit, WeakAction, trigger
+from game import Event, Mod, Source, Stat, Stats, Unit, UnitNode, WeakAction, trigger
 from game.stats import *
 from game.stats import ElementFlag
 
 from ...multipier import Calculator, Multipier, clamp
+from ...priority import Priority
 from ..flags import DamageFlag
 
 
@@ -17,21 +18,17 @@ class EventDamage(Event):
 
 @dataclass
 class EventDeath(Event):
-    node: "DeathNode"
+    node: "Death"
 
 
-class DeathNode(WeakAction):
-    def __init__(self, source: Source | None, unit: Unit, priority=0) -> None:
-        super().__init__("Dead", unit, priority)
-        self.killer_source = source
+class Death(UnitNode, Source):
+    def __init__(self, source: Source | None, unit: Unit, priority=Priority.Node.death) -> None:
+        super().__init__(unit, priority)
+        Source.__init__(self, source)
 
     def run(self):
         self.unit.status[Alive] = False
         trigger(EventDeath(self))
-        self.killer_source = None
-
-    def condition(self):
-        return True
 
 
 class DeathProtection(Mod):
@@ -75,13 +72,15 @@ class Damage(Calculator, Source):
     def deal(self):
         trigger(EventDamage(self))
         amount = self.calc()
+        if amount <= 0:
+            return
         self.target.status[HP, self] -= amount
         if self.target.status[HP] <= 0.0:
             protection = self.target.get_mod(DeathProtection)
             if protection is not None:
                 protection.protect(self)
             else:
-                DeathNode(self, self.target).chain()
+                Death(self, self.target).chain()
 
 
 class BaseDamageMultipier(Multipier[Damage]):
@@ -121,9 +120,7 @@ class WeakenMultipier(Multipier[Damage]):
 class DefenseMultipier(Multipier[Damage]):
     def get(self, calculator):
         with calculator.target_stats.temp(Stats(DEF(decrease=calculator.source_stats.get(DEF_Ignore)))):
-            return (calculator.source_stats.get(Level) * 10.0 + 200.0) / (
-                calculator.source_stats.get(Level) * 10.0 + 200.0 + max(0.0, calculator.target_stats.get(DEF))
-            )
+            return (calculator.source_stats.get(Level) * 10.0 + 200.0) / (calculator.source_stats.get(Level) * 10.0 + 200.0 + max(0.0, calculator.target_stats.get(DEF)))
 
 
 class ResistanceMultipier(Multipier[Damage]):
@@ -148,13 +145,3 @@ class BrokenMultipier(Multipier[Damage]):
 
     def get(self, calculator):
         return self.value
-
-
-class BreakEffectMultipier(Multipier[Damage]):
-    def get(self, calculator: Damage) -> float:
-        return 1.0 + calculator.source_stats[Break_Effect]
-
-
-class ToughnessMultipier(Multipier[Damage]):
-    def get(self, calculator: Damage) -> float:
-        return (calculator.target_stats[Toughness] + 20.0) * 0.025
