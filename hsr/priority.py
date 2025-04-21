@@ -30,10 +30,15 @@ class Priority:
         # Negative
         first = auto_negative()
         status_cap = auto_negative()
-        dot = auto_negative()
-        weakness_restore = auto_negative()
+        weakness_break = auto_negative()
 
         # Positive
+        dot = auto_positive()
+        frozen_dot = auto_positive()
+        entanglement_dot = auto_positive()
+        unfreeze = auto_positive()
+        buff_tick = auto_positive()
+        weakness_restore = auto_positive()
         last = auto_positive()
 
     @staticmethod

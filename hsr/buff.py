@@ -7,6 +7,7 @@ from game.events import EventTurn, EventTurnEnd
 from game.stats import *
 
 from .multipier import Calculator, Multipier
+from .priority import Priority
 
 
 class TickType(IntEnum):
@@ -56,39 +57,17 @@ class Buff(Mod):
         self.started = False
         self.duration = duration
         self.max_stack = max_stack
-        self.stacks = 0
+        self.stacks = min(max_stack, 1)
         self.dispelable = dispelable
 
     def add(self):
-        self.on_turn_start_listener = listen(EventTurn, self.on_turn_start)
-        self.on_turn_end_listener = listen(EventTurnEnd, self.on_turn_end)
         super().add()
         trigger(EventBuffAdd(self))
 
     def remove(self):
         self._keep_ref = None
-        self.on_turn_start_listener.remove()
-        self.on_turn_end_listener.remove()
         super().remove()
         trigger(EventBuffRemove(self))
-
-    def on_turn_start(self, event: EventTurn):
-        if event.unit is not self.unit:
-            return False
-        self.started = True
-        if self.tick_type == TickType.start:
-            self.tick()
-        return True
-
-    def on_turn_end(self, event: EventTurnEnd):
-        if event.unit is not self.unit:
-            return False
-        if self.tick_type == TickType.end:
-            self.tick()
-        elif self.started and self.tick_type == TickType.start_end:
-            self.started = False
-            self.tick()
-        return True
 
     def tick(self):
         self.duration -= 1
@@ -102,9 +81,11 @@ class Buff(Mod):
         trigger(EventBuffDispel(self, source))
         self.remove()
 
+    def set_stacks(self, stacks: int):
+        self.stacks = max(0, min(stacks, self.max_stack))
+
     def stack(self, amount=1):
-        self.stacks += amount
-        self.stacks = min(self.stacks, self.max_stack)
+        self.set_stacks(self.stacks + amount)
 
 
 class Debuff(Buff, Calculator):
@@ -173,3 +154,23 @@ class EffectHitMultipier(Multipier[Debuff]):
 class EffectRESMultipier(Multipier[Debuff]):
     def get(self, calculator) -> float:
         return 1.0 - calculator.target_stats.get(Effect_RES, debuff_flag=calculator.debuff_flag)
+
+
+def _on_turn_start(event: EventTurn):
+    for buff in event.unit.get_mods(Buff):
+        buff.started = True
+        if buff.tick_type == TickType.start:
+            buff.tick()
+
+
+def _on_turn_end(event: EventTurnEnd):
+    for buff in event.unit.get_mods(Buff):
+        if buff.tick_type == TickType.end:
+            buff.tick()
+        elif buff.started and buff.tick_type == TickType.start_end:
+            buff.started = False
+            buff.tick()
+
+
+listen(EventTurn, _on_turn_start, Priority.Event.buff_tick)
+listen(EventTurnEnd, _on_turn_end, Priority.Event.buff_tick)

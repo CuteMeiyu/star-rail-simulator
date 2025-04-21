@@ -3,6 +3,6 @@ from .chain import Chain, Node
 from .combat import Battle, BattlePhase, Mod, Team, Unit, UnitNode
 from .event import Event, Listener, listen, trigger
 from .flexflag import FlexFlag, MixFlag
-from .schedule import Runner, Schedule
+from .schedule import Runner, RunnerData, RunnerStatus, Schedule
 from .source import Source
 from .stats import Stat, Stats, Status

@@ -102,7 +102,7 @@ break_base_damage = [
 ]
 
 
-class BreakMultipier:
+class BreakScale:
     physical = 2.0
     fire = 2.0
     lightning = 1.0
@@ -112,12 +112,13 @@ class BreakMultipier:
     imaginary = 0.5
 
 
-class BreakExtraMultipier:
+class BreakExtraScale:
     physical = 0.16
     physical_elite = 0.07
     fire = 1.0
     lightning = 2.0
     ice = 1.0
     wind = 1.0
-    quantum = 0.6
-    imaginary = 0.3
+    quantum_damage = 0.6
+    quantum_delay = 2000.0
+    imaginary_delay = 3000.0

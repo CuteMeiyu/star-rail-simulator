@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import IntEnum, auto
 
 
-class Status(IntEnum):
+class RunnerStatus(IntEnum):
     ADVANCED = auto()
     NORMAL = auto()
     TURN_END = auto()
@@ -15,7 +15,7 @@ class RunnerData:
     name: str
     default_speed: float
     distance = 0.0
-    status = Status.NORMAL
+    status = RunnerStatus.NORMAL
     no_print = False
     previous_action_value = -1.0
 
@@ -33,13 +33,13 @@ class Runner:
         speed = self.get_speed()
         return math.inf if math.isclose(speed, 0.0) else self.runner_data.distance / speed
 
-    def action_advance(self, distance: float, status=Status.ADVANCED):
+    def action_advance(self, distance: float, status=RunnerStatus.ADVANCED):
         self.runner_data.distance -= distance
         if self.runner_data.distance < 0:
             self.runner_data.distance = 0.0
         self.runner_data.status = status
 
-    def action_delay(self, distance: float, status=Status.DELAYED):
+    def action_delay(self, distance: float, status=RunnerStatus.DELAYED):
         self.runner_data.distance += distance
         self.runner_data.status = status
 
@@ -78,12 +78,12 @@ class Schedule:
     def sort(self):
         self.runners.sort(key=lambda runner: (runner.get_action_value(), runner.runner_data.status))
         for runner in self.runners:
-            runner.runner_data.status = Status.NORMAL
+            runner.runner_data.status = RunnerStatus.NORMAL
 
     def time_advance(self, time: float):
         for runner in self.runners:
             action_value = runner.get_action_value()
-            runner.action_advance(time * runner.get_speed(), Status.NORMAL)
+            runner.action_advance(time * runner.get_speed(), RunnerStatus.NORMAL)
             runner.runner_data.previous_action_value -= action_value - runner.get_action_value()
         self.time += time
 
@@ -98,7 +98,7 @@ class Schedule:
     def turn_out(self):
         if self.current_runner is not None and self.current_runner in self.runners:
             self.current_runner.runner_data.distance = self.max_distance
-            self.current_runner.runner_data.status = Status.TURN_END
+            self.current_runner.runner_data.status = RunnerStatus.TURN_END
             self.current_runner.runner_data.previous_action_value = self.current_runner.get_action_value()
         self.sort()
 

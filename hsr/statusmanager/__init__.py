@@ -3,8 +3,5 @@ from .shortcuts import deal_damage, regenerate_energy
 from .status import energy, hp, toughness
 from .status.energy import EnergyRegenerate
 from .status.hp import Damage
-from .status.toughness import ToughnessDamage, WeaknessRestore, disable_weakness_restore, enable_weakness_restore
-from .statuscap import disable_status_cap, enable_status_cap
-
-enable_status_cap()
-enable_weakness_restore()
+from .status.toughness import ToughnessDamage, WeaknessRestore
+from .statuscap import BreakProtection, Death, DeathProtection

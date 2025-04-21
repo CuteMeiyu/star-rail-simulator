@@ -1,7 +1,40 @@
-from game import Listener
+import math
+from dataclasses import dataclass
+
+from game import Event, Mod, Source, Unit, UnitNode, listen, trigger
 from game.events import EventStatusChange
+from game.stats import *
 
 from ..priority import Priority
+
+
+@dataclass
+class EventDeath(Event):
+    node: "Death"
+
+
+class Death(UnitNode, Source):
+    def __init__(self, source: Source | None, unit: Unit, priority=Priority.Node.death) -> None:
+        super().__init__(unit, priority)
+        Source.__init__(self, source)
+
+    def run(self):
+        self.unit.status[Alive] = False
+        trigger(EventDeath(self))
+
+
+class DeathProtection(Mod):
+    def protect(self, source: Source | None): ...
+
+
+@dataclass
+class EventWeaknessBreak(Event):
+    source: Source | None
+    unit: Unit
+
+
+class BreakProtection(Mod):
+    def protect(self): ...
 
 
 def _on_status_change(event: EventStatusChange):
@@ -11,17 +44,23 @@ def _on_status_change(event: EventStatusChange):
     if event.current > max_status:
         event.unit.status.status[event.stat_type] = max_status
         event.current = max_status
-    elif event.current < 0:
+    elif event.current <= 0 or math.isclose(event.current, 0.0):
         event.unit.status.status[event.stat_type] = 0.0
         event.current = 0.0
+        if event.previous <= 0 or math.isclose(event.previous, 0.0):
+            return
+        if event.stat_type == HP:
+            if protection := event.unit.get_mod(DeathProtection):
+                protection.protect(event.source)
+            else:
+                Death(event.source, event.unit).chain()
+        elif event.stat_type == Toughness:
+            if protection := event.unit.get_mod(BreakProtection):
+                protection.protect()
+            else:
+                event.unit.status[Broken] = True
+                event.unit.action_delay(2500)
+                trigger(EventWeaknessBreak(event.source, event.unit))
 
 
-_listener = Listener(EventStatusChange, _on_status_change, Priority.Event.status_cap)
-
-
-def enable_status_cap():
-    _listener.add()
-
-
-def disable_status_cap():
-    _listener.remove()
+listen(EventStatusChange, _on_status_change, Priority.Event.status_cap)

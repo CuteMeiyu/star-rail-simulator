@@ -138,7 +138,7 @@ class ActionProvider(Mod):
 
 
 class ActionSupressor(Mod):
-    def check_available(self, action: Action):
+    def check_available(self, action: Action) -> bool:
         return True
 
 

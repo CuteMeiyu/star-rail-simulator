@@ -6,6 +6,11 @@ _T = TypeVar("_T")
 
 
 class Listener:
+    @overload
+    def __init__(self, event_type: type[_T], callback: Callable[[_T], Any], priority=0) -> None: ...
+    @overload
+    def __init__(self, event_type: UnionType, callback: Callable, priority=0) -> None: ...
+
     def __init__(self, event_type: type[_T] | UnionType, callback: Callable, priority=0) -> None:
         self.event_type = event_type
         self.callback = callback

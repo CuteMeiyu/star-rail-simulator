@@ -16,25 +16,6 @@ class EventDamage(Event):
     damage: "Damage"
 
 
-@dataclass
-class EventDeath(Event):
-    node: "Death"
-
-
-class Death(UnitNode, Source):
-    def __init__(self, source: Source | None, unit: Unit, priority=Priority.Node.death) -> None:
-        super().__init__(unit, priority)
-        Source.__init__(self, source)
-
-    def run(self):
-        self.unit.status[Alive] = False
-        trigger(EventDeath(self))
-
-
-class DeathProtection(Mod):
-    def protect(self, source: Source | None): ...
-
-
 class Damage(Calculator, Source):
     def __init__(
         self,
@@ -75,12 +56,6 @@ class Damage(Calculator, Source):
         if amount <= 0:
             return
         self.target.status[HP, self] -= amount
-        if self.target.status[HP] <= 0.0:
-            protection = self.target.get_mod(DeathProtection)
-            if protection is not None:
-                protection.protect(self)
-            else:
-                Death(self, self.target).chain()
 
 
 class BaseDamageMultipier(Multipier[Damage]):

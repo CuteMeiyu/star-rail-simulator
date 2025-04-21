@@ -6,6 +6,10 @@ from game.stats import Energy
 from hsr import characters, enemies
 
 
+def event_print(event: game.Event):
+    pass
+
+
 def node_print(event: EventNodeStart):
     if isinstance(event.node, game.UnitNode):
         print("Node:", event.node.__class__.__name__, event.node.unit.name)
@@ -63,7 +67,7 @@ def main():
         hsr.Turn(unit).chain()
 
 
-# game.listen(game.Event, event_print)
+game.listen(game.Event, event_print)
 game.listen(EventNodeStart, node_print)
 game.listen(EventActionEnd, attack_print)
 game.listen(EventActionEnd, over_turn_action_select, hsr.Priority.Event.first)

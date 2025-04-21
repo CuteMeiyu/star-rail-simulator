@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from game import Event, Listener, Mod, Source, Stats, Unit, WeakAction, conditions, trigger
+from game import Event, Source, Stats, Unit, WeakAction, listen, trigger
+from game.conditions import BrokenCondition
 from game.events import EventTurn
 from game.stats import *
 
@@ -15,25 +16,15 @@ class EventToughnessDamage(Event):
 
 
 @dataclass
-class EventWeaknessBreak(Event):
-    source: Source | None
-    unit: Unit
-
-
-@dataclass
 class EventWeaknessRestore(Event):
     weakness_restore: "WeaknessRestore"
-
-
-class BreakProtection(Mod):
-    def protect(self): ...
 
 
 class WeaknessRestore(WeakAction):
     def __init__(self, unit: Unit, percent=1.0, priority=0) -> None:
         super().__init__("Weakness Restore", unit, priority)
         self.percent = percent
-        self.remove_condition(conditions.BrokenCondition)
+        self.remove_condition(BrokenCondition)
 
     def run(self):
         self.unit.status[Broken] = False
@@ -71,13 +62,6 @@ class ToughnessDamage(Calculator, Source):
         if amount <= 0:
             return
         self.target.status[Toughness, self] -= amount
-        if not self.target.status[Broken] and self.target.status[Toughness] <= 0.0:
-            if protection := self.target.get_mod(BreakProtection):
-                protection.protect()
-            else:
-                self.target.status[Broken] = True
-                self.target.action_delay(2500)
-                trigger(EventWeaknessBreak(self, self.target))
 
 
 class BaseToughnessMultipier(Multipier[ToughnessDamage]):
@@ -105,12 +89,4 @@ def _on_turn(event: EventTurn):
     WeaknessRestore(event.unit).chain()
 
 
-_weakness_restore_listener = Listener(EventTurn, _on_turn, Priority.Event.weakness_restore)
-
-
-def enable_weakness_restore():
-    _weakness_restore_listener.add()
-
-
-def disable_weakness_restore():
-    _weakness_restore_listener.remove()
+listen(EventTurn, _on_turn, Priority.Event.weakness_restore)
