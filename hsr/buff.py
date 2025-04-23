@@ -61,6 +61,9 @@ class Buff(Mod):
         self.dispelable = dispelable
 
     def add(self):
+        if exist := self.get_stack_buff():
+            exist.stack(self)
+            return
         super().add()
         trigger(EventBuffAdd(self))
 
@@ -84,8 +87,16 @@ class Buff(Mod):
     def set_stacks(self, stacks: int):
         self.stacks = max(0, min(stacks, self.max_stack))
 
-    def stack(self, amount=1):
-        self.set_stacks(self.stacks + amount)
+    def stack(self, new_buff: "Buff"):
+        self.set_stacks(self.stacks + new_buff.stacks)
+        self.duration = max(self.duration, new_buff.duration)
+        self.started = False
+
+    def get_stack_buff(self):
+        for exist in self.unit.get_mods(type(self)):
+            if exist.get_source(Unit) is self.get_source(Unit):
+                return exist
+        return None
 
 
 class Debuff(Buff, Calculator):

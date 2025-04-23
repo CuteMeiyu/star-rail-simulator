@@ -212,8 +212,8 @@ class AScoopOfMoon(Buff):
         self.unit.stats -= self.stats
         return super().remove()
 
-    def stack(self, amount=1):
-        super().stack(amount)
+    def set_stacks(self, stacks: int):
+        super().set_stacks(stacks)
         self.dmg_boost.value = self.skill.dmg_boost * self.stacks
 
 
@@ -275,11 +275,7 @@ class Skill(Action):
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.draw(2)
-        buff = self.unit.get_mod(AScoopOfMoon)
-        if buff is None:
-            AScoopOfMoon(self, self.unit).add()
-        else:
-            buff.stack()
+        AScoopOfMoon(self, self.unit).add()
         ExtraTurn(self.unit).chain()
         if self.unit.check_eidolon(4) and random.random() < 0.24 and not self.unit.get_mod(AutarkyBuff):
             AutarkyBuff(self, self.unit).add()

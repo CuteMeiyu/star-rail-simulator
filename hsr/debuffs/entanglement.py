@@ -44,7 +44,7 @@ class Entanglement(Control):
             return
         if self.unit not in event.action.targets:
             return
-        self.stack(1)
+        self.set_stacks(self.stacks + 1)
 
 
 class EntanglementDamage(UnitNode):
