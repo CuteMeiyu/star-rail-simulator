@@ -10,4 +10,5 @@
     "isort.args": [
         "-l 200"
     ],
+    "python.analysis.diagnosticMode": "workspace",
 }
