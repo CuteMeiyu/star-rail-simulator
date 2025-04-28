@@ -31,6 +31,7 @@ class Priority:
         first = auto_negative()
         status_cap = auto_negative()
         weakness_break = auto_negative()
+        killing_energy = auto_negative()
 
         # Positive
         dot = auto_positive()

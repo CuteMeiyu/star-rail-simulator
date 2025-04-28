@@ -103,7 +103,7 @@ class Imprisonment(ImprisonBase):
         super().__init__(self.unit, "Imprisonment", source_unit, target_unit, 1, 1.5, 0.0, speed_down=0.1)
 
 
-def deal_breaking_damage(source_unit: Unit, target_unit: Unit, element: ElementFlag, scale: float):
+def _deal_breaking_damage(source_unit: Unit, target_unit: Unit, element: ElementFlag, scale: float):
     Damage(source_unit, source_unit, target_unit, DamageFlag.breaking, element, BaseBreakDamageMultipier(scale), ToughnessMultipier(), BreakEffectMultipier()).deal()
 
 
@@ -124,27 +124,27 @@ def _on_weakness_break(event: EventWeaknessBreak):
         source_stats = source_unit.stats
     if ElementFlag.fire in element:
         Burn(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.fire)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.fire)
     elif ElementFlag.ice in element:
         Frozen(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.ice)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.ice)
     elif ElementFlag.imaginary in element:
         target_unit.action_delay(data.BreakExtraScale.imaginary_delay * (1.0 + source_stats[Break_Effect]))
         Imprisonment(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.imaginary)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.imaginary)
     elif ElementFlag.lightning in element:
         Shock(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.lightning)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.lightning)
     elif ElementFlag.physical in element:
         Bleed(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.physical)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.physical)
     elif ElementFlag.quantum in element:
         target_unit.action_delay(data.BreakExtraScale.quantum_delay * (1.0 + source_stats[Break_Effect]))
         Entanglement(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.quantum)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.quantum)
     elif ElementFlag.wind in element:
         WindShear(source_unit, target_unit).add()
-        deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.wind)
+        _deal_breaking_damage(source_unit, target_unit, element, data.BreakScale.wind)
 
 
 listen(EventWeaknessBreak, _on_weakness_break, Priority.Event.weakness_break)
