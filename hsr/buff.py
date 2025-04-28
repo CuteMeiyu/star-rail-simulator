@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
-from game import Event, Mod, Source, Unit, listen, trigger
+from game import Event, Mod, Source, Unit, UnitNode, listen, trigger
 from game.events import EventTurn, EventTurnEnd
 from game.stats import *
 
@@ -167,20 +167,30 @@ class EffectRESMultipier(Multipier[Debuff]):
         return 1.0 - calculator.target_stats.get(Effect_RES, debuff_flag=calculator.debuff_flag)
 
 
+class BuffTickStart(UnitNode):
+    def run(self):
+        for buff in self.unit.get_mods(Buff):
+            buff.started = True
+            if buff.tick_type == TickType.start:
+                buff.tick()
+
+
+class BuffTickEnd(UnitNode):
+    def run(self):
+        for buff in self.unit.get_mods(Buff):
+            if buff.tick_type == TickType.end:
+                buff.tick()
+            elif buff.started and buff.tick_type == TickType.start_end:
+                buff.started = False
+                buff.tick()
+
+
 def _on_turn_start(event: EventTurn):
-    for buff in event.unit.get_mods(Buff):
-        buff.started = True
-        if buff.tick_type == TickType.start:
-            buff.tick()
+    BuffTickStart(event.unit).chain()
 
 
 def _on_turn_end(event: EventTurnEnd):
-    for buff in event.unit.get_mods(Buff):
-        if buff.tick_type == TickType.end:
-            buff.tick()
-        elif buff.started and buff.tick_type == TickType.start_end:
-            buff.started = False
-            buff.tick()
+    BuffTickEnd(event.unit).chain()
 
 
 listen(EventTurn, _on_turn_start, Priority.Event.buff_tick)
