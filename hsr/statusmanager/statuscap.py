@@ -47,14 +47,18 @@ def _on_status_change(event: EventStatusChange):
     elif event.current <= 0 or math.isclose(event.current, 0.0):
         event.unit.status.status[event.stat_type] = 0.0
         event.current = 0.0
-        if event.previous <= 0 or math.isclose(event.previous, 0.0):
+        if event.previous <= 0:
             return
         if event.stat_type == HP:
+            if not event.unit.status[Alive] or any(isinstance(node, Death) and node.unit is event.unit for node in event.unit.battle.chain.nodes):
+                return
             if protection := event.unit.get_mod(DeathProtection):
                 protection.protect(event.source)
             else:
                 Death(event.source, event.unit).chain()
         elif event.stat_type == Toughness:
+            if event.unit.status[Broken]:
+                return
             if protection := event.unit.get_mod(BreakProtection):
                 protection.protect()
             else:
