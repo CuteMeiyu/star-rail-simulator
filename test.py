@@ -2,12 +2,18 @@ import console
 import game
 import hsr
 from game.events import EventActionEnd, EventNodeStart, EventTurn, EventTurnEnd
-from game.stats import Energy
+from game.stats import HP, Energy
 from hsr import characters, enemies
+from hsr.events import EventDamage
 
 
 def event_print(event: game.Event):
     pass
+
+
+def damage_print(event: EventDamage):
+    source_name = getattr(event.damage.source, "name") if hasattr(event.damage.source, "name") else event.damage.source.__class__.__name__
+    print(source_name, event.damage.unit.name, event.damage.calc(), event.damage.target.name)
 
 
 def node_print(event: EventNodeStart):
@@ -52,22 +58,25 @@ def main():
     team1.add()
     for i in range(4):
         qq = characters.Qingque(team1)
-        qq.status[Energy] = 0.5 * qq.stats[Energy]
-        console.init_indicators(qq)
         game.ActionSelector(controller, qq).add()
-        qq.name += f"-{i+1}"
         qq.add()
     for i in range(4):
         dm = enemies.Dummy(team2)
-        console.init_indicators(dm)
-        dm.name += f"-{i+1}"
         dm.add()
+    for team in battle1.teams:
+        for i, unit in enumerate(team.units):
+            unit.stats += game.Stats(HP(increase=10.0))
+            unit.status[HP] = unit.stats[HP]
+            unit.status[Energy] = 0.5 * unit.stats[Energy]
+            unit.name += f"-{i+1}"
+            console.init_indicators(unit)
     battle1.start()
     for unit in battle1.turn():
         hsr.Turn(unit).chain()
 
 
 game.listen(game.Event, event_print)
+game.listen(EventDamage, damage_print, hsr.Priority.Event.last)
 game.listen(EventNodeStart, node_print)
 game.listen(EventActionEnd, attack_print)
 game.listen(EventActionEnd, over_turn_action_select, hsr.Priority.Event.first)

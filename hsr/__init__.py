@@ -1,5 +1,5 @@
 from . import multipiers
-from .breaking import break_listener
+from .breaking import deal_breaking_damage
 from .buff import Buff, Debuff, TickType
 from .multipier import Calculator, Multipier
 from .priority import Priority
