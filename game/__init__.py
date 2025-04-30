@@ -1,6 +1,6 @@
 from .action import Action, ActionFlag, ActionProvider, ActionSelector, ActionSupressor, Controller, WeakAction
 from .chain import Chain, Node
-from .combat import Battle, BattlePhase, Mod, Team, Unit, UnitNode
+from .combat import Battle, BattlePhase, Mod, SourcelessMod, Team, Unit, UnitNode
 from .event import Event, Listener, listen, trigger
 from .flexflag import FlexFlag, MixFlag
 from .schedule import Runner, RunnerData, RunnerStatus, Schedule

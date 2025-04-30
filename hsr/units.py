@@ -1,3 +1,5 @@
+from typing import Generic, TypeVar
+
 import game
 
 
@@ -72,3 +74,18 @@ class Enemy(game.Unit):
         super().__init__(name, schedule_name, stats, team)
         self.status[game.stats.Toughness] = self.stats[game.stats.Toughness]
         self.elite = elite
+
+
+class Memosprite(game.Unit):
+    def __init__(self, name: str, schedule_name: str, stats: game.Stats, team: game.Team, master: Character) -> None:
+        super().__init__(name, schedule_name, stats, team)
+        self.master = master
+
+
+_T_Memosprite = TypeVar("_T_Memosprite", bound=Memosprite)
+
+
+class MemospriteTracer(game.SourcelessMod, Generic[_T_Memosprite]):
+    def __init__(self, unit: game.Unit, sprite: _T_Memosprite, priority=0) -> None:
+        super().__init__(unit, priority)
+        self.sprite = sprite

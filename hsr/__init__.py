@@ -1,6 +1,4 @@
-import breaking
-
-from . import multipiers
+from . import breaking, multipiers
 from .buff import Buff, Debuff, TickType
 from .killing import set_killing_energy
 from .multipier import Calculator, Multipier
