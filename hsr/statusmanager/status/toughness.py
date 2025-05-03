@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from game import Event, Source, Stats, Unit, WeakAction, listen, trigger
+from game import Event, Source, Stats, Unit, UnitNode, WeakAction, listen, trigger
 from game.conditions import BrokenCondition
 from game.events import EventTurn
 from game.stats import *
@@ -30,6 +30,15 @@ class WeaknessRestore(WeakAction):
         self.unit.status[Broken] = False
         self.unit.status[Toughness, self] = self.unit.stats[Toughness] * self.percent
         trigger(EventWeaknessRestore(self))
+
+
+class WeaknessRestoreNode(UnitNode):
+    def __init__(self, unit: Unit, percent=1.0, priority=0) -> None:
+        super().__init__(unit, priority)
+        self.percent = percent
+
+    def run(self):
+        WeaknessRestore(self.unit, self.percent, self.priority).chain(True)
 
 
 class ToughnessDamage(Calculator, Source):
@@ -86,7 +95,7 @@ class WeaknessMultipier(Multipier[ToughnessDamage]):
 def _on_turn(event: EventTurn):
     if not event.unit.status[Broken]:
         return
-    WeaknessRestore(event.unit).chain()
+    WeaknessRestoreNode(event.unit).chain()
 
 
 listen(EventTurn, _on_turn, Priority.Event.weakness_restore)

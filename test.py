@@ -1,9 +1,9 @@
 import console
 import game
 import hsr
-from game.events import EventActionEnd, EventNodeStart, EventTurn, EventTurnEnd
+from game.events import EventActionEnd, EventEnterBattle, EventNodeStart, EventTurn, EventTurnEnd
 from game.stats import HP, Energy
-from hsr import characters, enemies
+from hsr import characters, enemies, multipiers, units
 from hsr.events import EventDamage
 
 
@@ -12,8 +12,15 @@ def event_print(event: game.Event):
 
 
 def damage_print(event: EventDamage):
-    source_name = getattr(event.damage.source, "name") if hasattr(event.damage.source, "name") else event.damage.source.__class__.__name__
-    print(source_name, event.damage.unit.name, event.damage.calc(), event.damage.target.name)
+    output = []
+    output.append(f"{event.damage.__class__.__name__}:")
+    output.append(getattr(event.damage.source, "name") if hasattr(event.damage.source, "name") else event.damage.source.__class__.__name__)
+    output.append(event.damage.unit.name)
+    output.append(f"{event.damage.calc():.0f}")
+    if (cm := event.damage.get_multipier(multipiers.CritMultipier)) and cm.crit:
+        output.append("CRIT!")
+    output.append(event.damage.target.name)
+    print(*output)
 
 
 def node_print(event: EventNodeStart):
@@ -49,27 +56,32 @@ def actor_indicator_remove(event: EventTurnEnd):
         indicator.remove()
 
 
+controller = console.ConsoleController()
+
+
+def setup_test(event: EventEnterBattle):
+    event.unit.stats += game.Stats(HP(increase=10.0, exclusive_flag=game.stats.ConvertFlag.convert))
+    event.unit.status[HP] = event.unit.stats[HP]
+    event.unit.status[Energy] = 0.5 * event.unit.stats[Energy]
+    console.init_indicators(event.unit)
+    if not isinstance(event.unit, units.Enemy):
+        game.ActionSelector(controller, event.unit).add()
+    else:
+        event.unit.stats += game.Stats(game.stats.SPD(decrease=0.75))
+
+
 def main():
-    controller = console.ConsoleController()
     battle1 = game.Battle()
     team1 = game.Team(battle1)
     team2 = game.Team(battle1)
     team2.add()
     team1.add()
-    for i in range(4):
-        qq = characters.Qingque(team1)
-        game.ActionSelector(controller, qq).add()
-        qq.add()
+    characters.Qingque(team1).add()
+    characters.RMC(team1).add()
     for i in range(4):
         dm = enemies.Dummy(team2)
         dm.add()
-    for team in battle1.teams:
-        for i, unit in enumerate(team.units):
-            unit.stats += game.Stats(HP(increase=10.0))
-            unit.status[HP] = unit.stats[HP]
-            unit.status[Energy] = 0.5 * unit.stats[Energy]
-            unit.name += f"-{i+1}"
-            console.init_indicators(unit)
+        dm.name += f"-{i+1}"
     battle1.start()
     for unit in battle1.turn():
         hsr.Turn(unit).chain()
@@ -82,4 +94,5 @@ game.listen(EventActionEnd, attack_print)
 game.listen(EventActionEnd, over_turn_action_select, hsr.Priority.Event.first)
 game.listen(EventTurn, actor_indicator_add)
 game.listen(EventTurnEnd, actor_indicator_remove)
+game.listen(EventEnterBattle, setup_test)
 main()

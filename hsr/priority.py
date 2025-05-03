@@ -34,12 +34,15 @@ class Priority:
         killing_energy = auto_negative()
 
         # Positive
-        dot = auto_positive()
+        # Turn Event
         frozen_dot = auto_positive()
         entanglement_dot = auto_positive()
+        dot = auto_positive()
         unfreeze = auto_positive()
         buff_tick = auto_positive()
         weakness_restore = auto_positive()
+        # Damage Event
+        true_damage = auto_positive()
         last = auto_positive()
 
     @staticmethod

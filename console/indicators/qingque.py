@@ -1,6 +1,6 @@
 from hsr.characters.qingque import AutarkyBuff, Passive, Qingque
 
-from ..console import Suffix
+from ..console import ModSuffix, Suffix
 
 
 class TileSuffix(Suffix):
@@ -11,11 +11,8 @@ class TileSuffix(Suffix):
         return "".join(passive.tiles)
 
 
-class AutarkySuffix(Suffix):
-    def string(self) -> str:
-        return "Au" if self.unit.get_mod(AutarkyBuff) else ""
+ModSuffix.table[AutarkyBuff] = "♠"
 
 
 def init(qingque: Qingque):
     TileSuffix(qingque).add()
-    AutarkySuffix(qingque).add()

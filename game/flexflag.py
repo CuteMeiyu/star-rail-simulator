@@ -67,6 +67,14 @@ class MixFlag:
         for flag in flags:
             self |= flag
 
+    def __len__(self):
+        return len(self.flag_dict)
+
+    def __or__(self, other: FlexFlag | Self):
+        mix_flag = MixFlag(self)
+        mix_flag |= other
+        return mix_flag
+
     def __ior__(self, other: FlexFlag | Self):
         if isinstance(other, FlexFlag):
             if type(other) in self.flag_dict:

@@ -76,8 +76,29 @@ class Enemy(game.Unit):
         self.elite = elite
 
 
+class RemembranceCharacter(Character):
+    def __init__(
+        self,
+        name: str,
+        schedule_name: str,
+        stats: game.Stats,
+        team: game.Team,
+        basic_level=6,
+        skill_level=10,
+        ult_level=10,
+        talent_level=10,
+        memosprite_skill_level=6,
+        memosprite_talent_level=6,
+        eidolon_level=0,
+        trace_level=3,
+    ) -> None:
+        self.memosprite_skill_level = memosprite_skill_level
+        self.memosprite_talent_level = memosprite_talent_level
+        super().__init__(name, schedule_name, stats, team, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_level)
+
+
 class Memosprite(game.Unit):
-    def __init__(self, name: str, schedule_name: str, stats: game.Stats, team: game.Team, master: Character) -> None:
+    def __init__(self, name: str, schedule_name: str, stats: game.Stats, team: game.Team, master: RemembranceCharacter) -> None:
         super().__init__(name, schedule_name, stats, team)
         self.master = master
 

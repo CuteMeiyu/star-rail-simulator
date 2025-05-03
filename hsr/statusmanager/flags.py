@@ -15,3 +15,9 @@ class DamageFlag(FlexFlag):
 
 DamageFlag.counter |= DamageFlag.follow_up
 DamageFlag.super_break |= DamageFlag.breaking
+
+
+class HealFlag(FlexFlag):
+    basic: "HealFlag"
+    skill: "HealFlag"
+    ult: "HealFlag"

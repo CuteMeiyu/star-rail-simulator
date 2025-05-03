@@ -1,9 +1,9 @@
 from game.combat import Unit
 from game.stats import *
-from hsr.characters import Qingque
+from hsr.characters import Mem, Qingque
 
-from ..console import NameIndicator, StatusSuffix, SuffixIndicator
-from . import qingque
+from ..console import ModSuffix, NameIndicator, StatusSuffix, SuffixIndicator
+from . import qingque, rmc
 
 
 def init_indicators(unit: Unit):
@@ -16,3 +16,6 @@ def init_indicators(unit: Unit):
         StatusSuffix(unit, Toughness).add()
     if isinstance(unit, Qingque):
         qingque.init(unit)
+    elif isinstance(unit, Mem):
+        rmc.init(unit)
+    ModSuffix(unit).add()

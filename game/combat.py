@@ -1,7 +1,7 @@
 from bisect import insort_right
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 from weakref import ref
 
 from .chain import Chain, Node
@@ -157,8 +157,8 @@ class Unit(Runner, Source):
                 mods.append(mod)
         return mods
 
-    def add(self):
-        self.team.add_unit(self)
+    def add(self, index=-1):
+        self.team.add_unit(self, index)
 
     def remove(self):
         self.team.remove_unit(self)
@@ -206,12 +206,14 @@ class Team:
         else:
             self.units.insert(index, unit)
         self.battle.schedule.append(unit)
+        trigger(EventEnterBattle(unit))
 
     def remove_unit(self, unit: Unit):
         for mod in unit.get_mods(Mod):
             mod.remove()
         self.units.remove(unit)
         self.battle.schedule.remove(unit)
+        # trigger(EventExitBattle(self))
 
     def select_adjacent_units(self, unit: Unit):
         index = self.units.index(unit)
@@ -259,6 +261,7 @@ class Battle:
         self.phase = BattlePhase.in_turn
         self.end_node: Node | None = None
         self.is_over_fast: bool = False
+        self.context: dict[str, Any] = {}
 
     def start(self):
         self.started = True

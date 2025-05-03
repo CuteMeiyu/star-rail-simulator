@@ -1,14 +1,11 @@
 import random
 from dataclasses import dataclass
-from typing import Generic, TypeVar
 
-from game import Event, Mod, Source, Stat, Stats, Unit, UnitNode, WeakAction, trigger
+from game import Event, Source, Stat, Stats, Unit, trigger
 from game.stats import *
-from game.stats import ElementFlag
 
 from ...multipier import Calculator, Multipier, clamp
-from ...priority import Priority
-from ..flags import DamageFlag
+from ..flags import DamageFlag, HealFlag
 
 
 @dataclass
@@ -16,16 +13,13 @@ class EventDamage(Event):
     damage: "Damage"
 
 
+@dataclass
+class EventHeal(Event):
+    heal: "Heal"
+
+
 class Damage(Calculator, Source):
-    def __init__(
-        self,
-        source: Source | None,
-        unit: Unit,
-        target: Unit,
-        flag: DamageFlag,
-        element: ElementFlag,
-        *multipiers: Multipier,
-    ) -> None:
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, flag: DamageFlag, element: ElementFlag, *multipiers: Multipier) -> None:
         super().__init__()
         Source.__init__(self, source)
         self.unit = unit
@@ -120,3 +114,53 @@ class BrokenMultipier(Multipier[Damage]):
 
     def get(self, calculator):
         return self.value
+
+
+class Heal(Calculator, Source):
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, flag: HealFlag, *multipiers: Multipier) -> None:
+        super().__init__()
+        Source.__init__(self, source)
+        self.unit = unit
+        self.target = target
+        self.source_stats = Stats()
+        self.target_stats = Stats()
+        self.source_stats += self.unit.stats
+        self.target_stats += self.target.stats
+        self.flag = flag
+        self.add_multipiers(
+            *multipiers,
+            OutgoingHealingBoostMultipier(),
+        )
+
+    def calc(self):
+        with self.source_stats.temp(flag=self.flag):
+            with self.target_stats.temp(flag=self.flag):
+                return super().calc()
+
+    def deal(self):
+        trigger(EventHeal(self))
+        amount = self.calc()
+        if amount <= 0:
+            return
+        self.target.status[HP, self] += amount
+
+
+class OutgoingHealingBoostMultipier(Multipier[Heal]):
+    def get(self, calculator: Heal) -> float:
+        return calculator.source_stats[Outgoing_Healing_Boost]
+
+
+class TrueDamage(Damage):
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, amount: float) -> None:
+        super().__init__(source, unit, target, DamageFlag(), element=ElementFlag())
+        self.clear_multipier()
+        self.add_multipier(FixedAmountMultipier(amount))
+
+
+class FixedAmountMultipier(Multipier):
+    def __init__(self, amount: float) -> None:
+        super().__init__()
+        self.amount = amount
+
+    def get(self, calculator) -> float:
+        return self.amount

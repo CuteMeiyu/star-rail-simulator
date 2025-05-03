@@ -1,7 +1,7 @@
 import random
 from dataclasses import dataclass
 
-from game import Action, ActionProvider, ActionSelector, Controller, Event, Unit, UnitNode, WeakAction, trigger
+from game import Action, ActionProvider, ActionSelector, Controller, Event, Unit, UnitNode, trigger
 
 from .priority import Priority
 
@@ -75,6 +75,7 @@ class Turn(UnitNode):
                 else:
                     continue
             else:
+                action.context["in_turn"] = True
                 action.chain(True)
             break
 

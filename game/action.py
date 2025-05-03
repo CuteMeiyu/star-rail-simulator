@@ -109,12 +109,11 @@ class Action(Node, Source):
 
 
 class BounceAction(Action):
-    def bounce(self, hp_above_0=True, targets: list[Unit] | None = None):
+    def bounce(self, ignore_limbo=True, targets: list[Unit] | None = None):
         if targets is None:
-            assert self.main_target is not None
-            targets = self.main_target.select_allies()
+            targets = self.unit.select_enemies()
         available_targets: list[Unit] = []
-        if hp_above_0:
+        if ignore_limbo:
             available_targets = [ally for ally in targets if ally.status[HP] > 0]
         if len(available_targets) == 0:
             available_targets = targets
@@ -171,9 +170,9 @@ class Controller:
 
 
 class ActionSelector(Mod):
-    def __init__(self, group: Controller, unit: Unit, priority=0) -> None:
+    def __init__(self, controller: Controller, unit: Unit, priority=0) -> None:
         super().__init__(None, unit, priority)
-        self.controller = group
+        self.controller = controller
 
 
 def _on_node_start(event: EventNodeStart):

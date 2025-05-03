@@ -33,33 +33,58 @@ class PathFlag(_FlexFlag):
     preservation: "PathFlag"
 
 
+class ConvertFlag(_FlexFlag):
+    convert: "ConvertFlag"
+
+
 class Stat(_Generic[_T]):
-    def __init__(self, flag: _FlexFlag | _MixFlag | None = None) -> None:
+    def __init__(self, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
         if flag is None:
             self.flag = _MixFlag()
         else:
             self.flag = _MixFlag(flag)
+        if exclusive_flag is None:
+            self.exclusive_flag = _MixFlag()
+        else:
+            self.exclusive_flag = _MixFlag(exclusive_flag)
+
+    def check_adapt(self, other: _Self):
+        if other.flag not in self.flag:
+            return False
+        if len(self.exclusive_flag) > 0 and self.exclusive_flag in other.exclusive_flag:
+            return False
+        return True
 
     def __iadd__(self, other: _Self) -> _Self: ...
     def get_value(self) -> _T: ...
 
 
 class _ComplexStat(Stat[float]):
-    def __init__(self, base=0.0, flat=0.0, increase=0.0, decrease=0.0, flag: _FlexFlag | _MixFlag | None = None) -> None:
+    def __init__(self, base=0.0, flat=0.0, increase=0.0, decrease=0.0, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.base = base
         self.flat = flat
         self.increase = increase
         self.decrease = decrease
-        super().__init__(flag)
+        super().__init__(flag, exclusive_flag)
 
     def __iadd__(self, other: _Self) -> _Self:  # type: ignore
-        if other.flag not in self.flag:
-            return self
-        self.base += other.base
-        self.flat += other.flat
-        self.increase += other.increase
-        self.decrease += other.decrease
+        self.base += other.get_base()
+        self.flat += other.get_flat()
+        self.increase += other.get_increase()
+        self.decrease += other.get_decrease()
         return self
+
+    def get_base(self):
+        return self.base
+
+    def get_flat(self):
+        return self.flat
+
+    def get_increase(self):
+        return self.increase
+
+    def get_decrease(self):
+        return self.decrease
 
     def get_value(self) -> float:
         return (self.base * (1 + self.increase) + self.flat) * (1 - self.decrease)
@@ -94,14 +119,12 @@ class Toughness(_ComplexStat):
 
 
 class _SimpleStat(Stat[float]):
-    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.value = value
-        super().__init__(flag)
+        super().__init__(flag, exclusive_flag)
 
     def __iadd__(self, other: _Self) -> _Self:  # type: ignore
-        if other.flag not in self.flag:
-            return self
-        self.value += other.value
+        self.value += other.get_value()
         return self
 
     def get_value(self) -> float:
@@ -186,14 +209,14 @@ DebuffFlag.wind_shear |= DebuffFlag.dot
 
 
 class Effect_RES(Stat[float]):
-    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, debuff_flag: DebuffFlag | None = None) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None, debuff_flag: DebuffFlag | None = None) -> None:
         self.value = value
         self.multipiers: dict[int, float] = {}
         if debuff_flag is None:
             self.debuff_flag = DebuffFlag()
         else:
             self.debuff_flag = debuff_flag
-        super().__init__(flag)
+        super().__init__(flag, exclusive_flag)
 
     def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         if self.debuff_flag == other.debuff_flag:
@@ -210,9 +233,9 @@ class Effect_RES(Stat[float]):
 
 
 class DMG_Mitigation(Stat[float]):
-    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None) -> None:
+    def __init__(self, value=0.0, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.value = max(1 - value, 0)
-        super().__init__(flag)
+        super().__init__(flag, exclusive_flag)
 
     def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         self.value *= other.value
@@ -228,8 +251,8 @@ _T_FlexFlag = _TypeVar("_T_FlexFlag", bound=_FlexFlag)
 class _FlagStat(Stat[_T_FlexFlag], _Generic[_T_FlexFlag]):
     flag_type: type[_T_FlexFlag]
 
-    def __init__(self, value: _T_FlexFlag | None = None, flag: _FlexFlag | _MixFlag | None = None) -> None:
-        super().__init__(flag)
+    def __init__(self, value: _T_FlexFlag | None = None, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
+        super().__init__(flag, exclusive_flag)
         if value is not None:
             self.value = value
         else:
@@ -263,9 +286,9 @@ class CombatType(_FlagStat[ElementFlag], flag_type=ElementFlag):
 
 
 class _IntStat(Stat[int]):
-    def __init__(self, value=0, flag: _FlexFlag | _MixFlag | None = None) -> None:
+    def __init__(self, value=0, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
         self.value = value
-        super().__init__(flag)
+        super().__init__(flag, exclusive_flag)
 
     def __iadd__(self, other: _Self) -> _Self:  # type: ignore
         self.value += other.value
@@ -298,8 +321,8 @@ class NoQuit(_IntStat):
 class BoolStat(Stat[bool]):
     default = False
 
-    def __init__(self, flag: _FlexFlag | _MixFlag | None = None) -> None:
-        super().__init__(flag)
+    def __init__(self, flag: _FlexFlag | _MixFlag | None = None, exclusive_flag: _FlexFlag | _MixFlag | None = None) -> None:
+        super().__init__(flag, exclusive_flag)
         self.value = self.default
 
     def __init_subclass__(cls, default: bool) -> None:
@@ -329,20 +352,24 @@ class Stats:
     def __init__(self, *stats: Stat[_Any], comment="") -> None:
         self.stats: list[Stat[_Any]] = list(stats)
         self.children: list[Stats] = []
+        self.locks: list[Stat[_Any]] = []
         self.comment = comment
         self._temp_flag: _FlexFlag | _MixFlag | None = None
 
     def get_stat(self, stat_type: type[_T_Stat], no_child=False, **kwargs: _Any) -> _T_Stat:
+        for lock in self.locks:
+            if type(lock) is stat_type:
+                return lock
         if "flag" in kwargs and self._temp_flag is not None:
-            flag = _MixFlag(kwargs["flag"], self._temp_flag)
+            kwargs["flag"] |= self._temp_flag
         else:
-            flag = self._temp_flag
-        stat = stat_type(flag=flag, **kwargs)
+            kwargs["flag"] = self._temp_flag
+        stat = stat_type(**kwargs)
         stack: list[Stats] = [self]
         while len(stack) > 0:
             child = stack.pop()
             for s in child.stats:
-                if type(s) is stat_type:
+                if isinstance(s, stat_type) and stat.check_adapt(s):
                     stat += s
             if not no_child:
                 stack.extend(child.children)

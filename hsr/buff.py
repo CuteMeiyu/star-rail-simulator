@@ -2,6 +2,8 @@ import random
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
+from typing_extensions import deprecated
+
 from game import Event, Mod, Source, Unit, UnitNode, listen, trigger
 from game.events import EventTurn, EventTurnEnd
 from game.stats import *
@@ -131,6 +133,11 @@ class Debuff(Buff, Calculator):
             EffectHitMultipier(),
             EffectRESMultipier(),
         )
+
+    @deprecated("Use `.apply()` for Effect RES.")
+    def add(self):
+        """Add debuff ignore Effect RES"""
+        return super().add()
 
     def calc(self):
         with self.source_stats.temp(flag=self.debuff_flag):

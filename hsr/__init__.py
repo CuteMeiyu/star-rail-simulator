@@ -1,6 +1,5 @@
-from . import breaking, multipiers
+from . import breaking, killing, multipiers
 from .buff import Buff, Debuff, TickType
-from .killing import set_killing_energy
 from .multipier import Calculator, Multipier
 from .priority import Priority
 from .statusmanager import *

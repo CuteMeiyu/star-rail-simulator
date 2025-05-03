@@ -1,9 +1,8 @@
 import math
 
-from game.action import Action, ActionFlag, Controller
-from game.combat import Battle, SourcelessMod, Team, Unit
+from game import Action, ActionFlag, Battle, Controller, Mod, SourcelessMod, Team, Unit
 from game.stats import *
-from hsr.ult import UltActivate
+from hsr import UltActivate
 
 
 class Indicator(SourcelessMod):
@@ -54,7 +53,9 @@ class ConsoleController(Controller):
         code_target_action: dict[str, dict[str, Action]] = {}
         for action in actions:
             ability_code = ""
-            if ActionFlag.basic in action.flag:
+            if "hotkey" in action.context:
+                ability_code += action.context["hotkey"]
+            elif ActionFlag.basic in action.flag:
                 ability_code += "A"
             elif ActionFlag.skill in action.flag:
                 ability_code += "E"
@@ -113,3 +114,10 @@ class StatusSuffix(Suffix):
             result = str(int(current))
         self.previous = current
         return result
+
+
+class ModSuffix(Suffix):
+    table: dict[type[Mod], str] = {}
+
+    def string(self) -> str:
+        return "|".join(string for mod_type, string in self.table.items() if self.unit.get_mod(mod_type))

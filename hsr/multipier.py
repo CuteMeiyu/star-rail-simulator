@@ -39,6 +39,9 @@ class Calculator:
         if multipier := self.get_multipier(multipier_type):
             self.multipiers.remove(multipier)
 
+    def clear_multipier(self):
+        self.multipiers.clear()
+
     def update_multipier(self, multipier: Multipier):
         old_multipier = self.get_multipier(type(multipier))
         assert old_multipier is not None
