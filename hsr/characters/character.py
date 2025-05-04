@@ -1,5 +1,3 @@
-from typing import Generic, TypeVar
-
 import game
 
 
@@ -69,13 +67,6 @@ class Character(game.Unit):
         self.eidolon_flag &= ~(0b1000000 >> eidolon_level)
 
 
-class Enemy(game.Unit):
-    def __init__(self, name: str, schedule_name: str, stats: game.Stats, team: game.Team, elite: bool) -> None:
-        super().__init__(name, schedule_name, stats, team)
-        self.status[game.stats.Toughness] = self.stats[game.stats.Toughness]
-        self.elite = elite
-
-
 class RemembranceCharacter(Character):
     def __init__(
         self,
@@ -102,11 +93,24 @@ class Memosprite(game.Unit):
         super().__init__(name, schedule_name, stats, team)
         self.master = master
 
+    def add(self, index=-1):
+        self.add_tracer()
+        return super().add(index)
 
-_T_Memosprite = TypeVar("_T_Memosprite", bound=Memosprite)
+    def remove(self):
+        self.remove_tracer()
+        return super().remove()
+
+    def add_tracer(self):
+        MemospriteTracer(self.master, self).add()
+
+    def remove_tracer(self):
+        for tracer in self.master.get_mods(MemospriteTracer):
+            if tracer.sprite is self:
+                tracer.remove()
 
 
-class MemospriteTracer(game.SourcelessMod, Generic[_T_Memosprite]):
-    def __init__(self, unit: game.Unit, sprite: _T_Memosprite, priority=0) -> None:
+class MemospriteTracer(game.SourcelessMod):
+    def __init__(self, unit: game.Unit, sprite: Memosprite, priority=0) -> None:
         super().__init__(unit, priority)
         self.sprite = sprite

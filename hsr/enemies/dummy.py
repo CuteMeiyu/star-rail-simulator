@@ -6,7 +6,7 @@ from game.combat import Team, Unit
 from game.stats import *
 
 from ..statusmanager import DamageFlag, deal_damage, regenerate_energy
-from ..units import Enemy
+from .enemy import Enemy
 
 
 class Dummy(Enemy):

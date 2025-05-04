@@ -1,5 +1,6 @@
 import math
 from dataclasses import dataclass
+from typing import Any
 
 from game import Event, Mod, Source, Unit, UnitNode, listen, trigger
 from game.events import EventStatusChange
@@ -38,7 +39,7 @@ class BreakProtection(Mod):
 
 
 def _on_status_change(event: EventStatusChange):
-    if not isinstance(event.current, float):
+    if not isinstance(event.current, float | int):
         return
     max_status = event.unit.stats[event.stat_type]
     if event.current > max_status:

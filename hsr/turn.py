@@ -45,39 +45,32 @@ class Turn(UnitNode):
         while True:
             selector = self.unit.get_mod(ActionSelector)
             controller = None if selector is None else selector.controller
-            controller_action_dict: dict[Controller | None, list[Action]] = {controller: available_actions}
+            # controller_action_dict: dict[Controller | None, list[Action]] = {controller: available_actions}
             for ally in self.unit.team.units:
                 ally_selector = ally.get_mod(ActionSelector)
                 ally_controller = None if ally_selector is None else ally_selector.controller
+                if ally_controller is not controller:
+                    continue
                 ally_available_actions = get_available_actions(ally.get_mods(ActionProvider), True)
-                if ally_controller in controller_action_dict:
-                    controller_action_dict[ally_controller] += ally_available_actions
-                else:
-                    controller_action_dict[ally_controller] = ally_available_actions
-            action: Action | None = None
-            for con, actions in controller_action_dict.items():
-                if con is controller or con is None or len(actions) == 0:
-                    continue
-                action = con.choose_action(actions, True)
-                if action is not None:
-                    break
-            if action is None and len(controller_action_dict[controller]) > 0:
-                if controller is None:
-                    action = random.choice(controller_action_dict[controller])
-                else:
-                    action = controller.choose_action(controller_action_dict[controller], False)
-            if action is None:
+                for ally_action in ally_available_actions:
+                    ally_action.context["over_turn"] = True
+                available_actions += ally_available_actions
+            if len(available_actions) == 0:
                 return
-            if "over_turn" in action.context:
-                action.chain(False)
-                if action.priority < self.priority:
-                    self.chain(True)
-                else:
-                    continue
+            if controller is None:
+                action = random.choice(available_actions)
             else:
+                action = controller.choose_action(available_actions, False)
+            assert action is not None
+            if "over_turn" not in action.context:
                 action.context["in_turn"] = True
                 action.chain(True)
-            break
+                return
+            action.chain()
+            if action.priority < self.priority:
+                self.chain(True)
+                return
+            continue
 
 
 class OverTurn(UnitNode):

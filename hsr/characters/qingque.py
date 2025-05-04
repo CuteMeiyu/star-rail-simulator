@@ -12,7 +12,7 @@ from ..events import EventDamage
 from ..statusmanager import DamageFlag, deal_damage, regenerate_energy
 from ..turn import EventUnitReady, Turn
 from ..ult import UltActivator
-from ..units import Character
+from .character import Character
 
 
 class Qingque(Character):
@@ -37,7 +37,7 @@ class Qingque(Character):
 
 class HiddenHand(Buff):
     def __init__(self, source: Source | None, unit: Character) -> None:
-        super().__init__(source, "Hidden Hand", unit, 1, TickType.end)
+        super().__init__(source, "Hidden Hand", unit, 1, TickType.start_end)
         self.stats = Stats(ATK(increase=data.talent_atk_boost[unit.talent_level - 1]))
 
     def add(self):
@@ -87,7 +87,7 @@ class Passive(Mod):
         self.tiles = sorted(self.tiles, key=lambda x: (-self.tiles.count(x), self.tiles.index(x)))
         self.tiles = self.tiles[:4]
         if self.is_win() and self.unit.get_mod(HiddenHand) is None:
-            HiddenHand(self, self.unit).add()
+            HiddenHand(self, self.unit).apply()
 
     def pop(self):
         if len(self.tiles) == 0:
@@ -190,7 +190,7 @@ class EnhausedBasic(Action):
         if hidden_hand is not None:
             hidden_hand.remove()
         if self.unit.check_trace(3):
-            WinningHand(self, self.unit).add()
+            WinningHand(self, self.unit).apply()
         if self.unit.get_mod(AutarkyBuff):
             EnhausedAutarky(self, self.unit, self.main_target).chain()
         if self.unit.check_eidolon(6):
@@ -275,10 +275,10 @@ class Skill(Action):
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.draw(2)
-        AScoopOfMoon(self, self.unit).add()
+        AScoopOfMoon(self, self.unit).apply()
         ExtraTurn(self.unit).chain()
         if self.unit.check_eidolon(4) and random.random() < 0.24 and not self.unit.get_mod(AutarkyBuff):
-            AutarkyBuff(self, self.unit).add()
+            AutarkyBuff(self, self.unit).apply()
 
 
 class Ult(Action):

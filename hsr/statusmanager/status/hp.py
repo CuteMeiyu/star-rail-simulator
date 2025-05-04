@@ -147,7 +147,7 @@ class Heal(Calculator, Source):
 
 class OutgoingHealingBoostMultipier(Multipier[Heal]):
     def get(self, calculator: Heal) -> float:
-        return calculator.source_stats[Outgoing_Healing_Boost]
+        return 1.0 + calculator.source_stats[Outgoing_Healing_Boost]
 
 
 class TrueDamage(Damage):

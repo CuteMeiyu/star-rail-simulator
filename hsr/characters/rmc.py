@@ -5,12 +5,12 @@ from game.stats import *
 from ..buff import Buff, TickType
 from ..data.characters import rmc as data
 from ..debuffs import Control
-from ..events import EventDamage
+from ..events import EventDamage, EventDeath
 from ..multipiers import MaxHPPercentMultipier
 from ..priority import Priority
-from ..statusmanager import DamageFlag, Heal, HealFlag, TrueDamage, deal_damage, regenerate_energy
+from ..statusmanager import Damage, DamageFlag, Heal, HealFlag, TrueDamage, deal_damage, regenerate_energy
 from ..ult import UltActivator
-from ..units import Character, Memosprite, MemospriteTracer, RemembranceCharacter
+from .character import Character, Memosprite, MemospriteTracer, RemembranceCharacter
 
 
 class Mem(Memosprite):
@@ -19,29 +19,15 @@ class Mem(Memosprite):
         self.energy = 0.0
         self.accumulated = 0.0
         MemActionProvider(self, self, False).add()
-        ForceAttack(self).add()
-
-    def regenerate_energy(self, amount: float):
-        if amount <= 0:
-            return
-        self.energy += amount
-        if self.energy >= 1.0:
-            self.energy = 1.0
-            self.action_advance(self.runner_data.distance)
-            for fa in self.get_mods(ForceAttack):
-                fa.remove()
-        else:
-            if not self.get_mod(ForceAttack):
-                ForceAttack(self).add()
+        ForceAttackSelector(self).add()
 
     def add(self, index=-1):
-        self.tracer = MemTracer(self.master, self)
-        self.tracer.add()
         self.listener = listen(EventStatusChange, self.on_status_change)
         self.listener2 = listen(EventEnterBattle, self.on_enter_battle)
+        self.listener3 = listen(EventDeath, self.on_death)
         for ally in self.team.units:
-            FriendsTogether(self, ally).add()
-        self.regenerate_energy(0.5)
+            FriendsTogether(self, ally).apply()
+        self.regenerate_energy(data.mem_spawn_energy)
         index = self.team.units.index(self.master) + 1
         super().add(index)
         if self.master.check_trace(1) and not self.master.get_mod(Trace1Trigged):
@@ -49,11 +35,17 @@ class Mem(Memosprite):
             Trace1Trigged(self.master).add()
 
     def remove(self):
-        self.tracer.remove()
         self.listener.remove()
         self.listener2.remove()
-        self.master.action_advance(2500)
+        self.listener3.remove()
+        for ally in self.team.units:
+            for buff in ally.get_mods(FriendsTogether):
+                buff.remove()
+        self.master.action_advance(data.mem_despawn_action_advance)
         return super().remove()
+
+    def add_tracer(self):
+        MemTracer(self.master, self).add()
 
     def on_status_change(self, event: EventStatusChange[Energy, float]):
         if event.unit.team is not self.team:
@@ -64,17 +56,39 @@ class Mem(Memosprite):
             return
         delta = event.current - event.previous
         self.accumulated += delta
-        self.regenerate_energy(self.accumulated // 10 * 0.01)
-        self.accumulated %= 10
+        self.regenerate_energy(self.accumulated // data.talent_energy_per * data.talent_mem_energy)
+        self.accumulated %= data.talent_energy_per
 
     def on_enter_battle(self, event: EventEnterBattle):
         if event.unit.team is not self.team:
             return
-        FriendsTogether(self, event.unit).add()
+        FriendsTogether(self, event.unit).apply()
+
+    def on_death(self, event: EventDeath):
+        if event.node.unit is not self.master:
+            return
+        self.status[HP, self] = 0
+
+    def regenerate_energy(self, amount: float):
+        if amount <= 0:
+            return
+        self.energy += amount
+        if self.energy >= 1.0:
+            self.energy = 1.0
+            self.action_advance(self.runner_data.distance)
+            for force_attack in self.get_mods(ForceAttackSelector):
+                force_attack.remove()
+        else:
+            if not self.get_mod(ForceAttackSelector):
+                ForceAttackSelector(self).add()
 
 
-class MemTracer(MemospriteTracer[Mem]):
-    pass
+class MemTracer(MemospriteTracer):
+    @property
+    def mem(self):
+        mem = self.sprite
+        assert isinstance(mem, Mem)
+        return mem
 
 
 class BaddiesTrouble(BounceAction):
@@ -133,6 +147,7 @@ class MemsSupport(Buff):
             self.eidolon1_enabled = source.eidolon1_enabled
             self.eidolon4_enabled = source.eidolon4_enabled
             self.is_copy = True
+            self.rmc = source.rmc
         else:
             super().__init__(source, "Mem's Support", unit, 3, TickType.start_end)
             mem = self.get_source(Mem)
@@ -142,6 +157,7 @@ class MemsSupport(Buff):
             self.eidolon1_enabled = mem.master.check_eidolon(1)
             self.eidolon4_enabled = mem.master.check_eidolon(4)
             self.is_copy = False
+            self.rmc = mem.master
         self.copy_buffs: list[MemsSupport] = []
 
     @property
@@ -154,19 +170,23 @@ class MemsSupport(Buff):
         return self.base_scale
 
     def add(self):
-        self.listener = listen(EventDamage, self.on_damage, Priority.Event.true_damage)
+        self.listener = listen(EventStatusChange, self.on_status_change, Priority.Event.true_damage)
         self.listener2 = listen(EventEnterBattle, self.on_enter_battle)
         self.stats = Stats(CRIT_Rate(data.e1_dmg_crit)) if self.eidolon1_enabled else Stats()
         self.unit.stats += self.stats
         if self.is_copy:
             assert isinstance(self.source, MemsSupport)
             self.source.copy_buffs.append(self)
-        elif self.eidolon1_enabled:
-            if isinstance(self.unit, RemembranceCharacter):
-                for tracer in self.unit.get_mods(MemospriteTracer):
-                    MemsSupport(self, tracer.sprite).add()
-            elif isinstance(self.unit, Memosprite):
-                MemsSupport(self, self.unit.master).add()
+        else:
+            for buff in self.unit.get_mods(MemsSupport):
+                if buff.rmc is self.rmc:
+                    buff.remove()
+            if self.eidolon1_enabled:
+                if isinstance(self.unit, RemembranceCharacter):
+                    for tracer in self.unit.get_mods(MemospriteTracer):
+                        MemsSupport(self, tracer.sprite).apply()
+                elif isinstance(self.unit, Memosprite):
+                    MemsSupport(self, self.unit.master).apply()
         return super().add()
 
     def remove(self):
@@ -177,14 +197,34 @@ class MemsSupport(Buff):
             if copy._keep_ref is None:  # already removed
                 continue
             copy.remove()
-        return super().remove()
+        super().remove()
+        if not self.is_copy:  # check if both the master and memosprite have the original version buff
+            friends: list[Unit] = []
+            if isinstance(self.unit, RemembranceCharacter):
+                for tracer in self.unit.get_mods(MemospriteTracer):
+                    friends.append(tracer.sprite)
+            elif isinstance(self.unit, Memosprite):
+                friends.append(self.unit.master)
+            for friend in friends:
+                for buff in friend.get_mods(MemsSupport):
+                    if not buff.is_copy and buff.rmc is self.rmc:
+                        MemsSupport(buff, self.unit).apply()
+                        break
+                else:
+                    continue
+                break
+        del self.rmc
 
-    def on_damage(self, event: EventDamage):
-        if event.damage.unit is not self.unit:
+    def on_status_change(self, event: EventStatusChange[HP, float]):
+        if event.stat_type is not HP:
             return
-        if isinstance(event.damage, TrueDamage):
+        if not isinstance(event.source, Damage):
             return
-        TrueDamage(self, self.unit, event.damage.target, event.damage.calc() * self.scale).deal()
+        if event.source.unit is not self.unit:
+            return
+        if isinstance(event.source, TrueDamage):
+            return
+        TrueDamage(self, self.unit, event.source.target, event.source.calc() * self.scale).deal()
 
     def on_enter_battle(self, event: EventEnterBattle):
         if not self.eidolon1_enabled:
@@ -195,7 +235,12 @@ class MemsSupport(Buff):
             return
         if event.unit.master is not self.unit:
             return
-        MemsSupport(self, event.unit).add()
+        MemsSupport(self, event.unit).apply()
+
+    def get_stack_buff(self):
+        for buff in self.unit.get_mods(type(self)):
+            if buff.rmc is self.rmc and (self.is_copy or not buff.is_copy):
+                return buff
 
 
 class LemmeHelpYou(Action):
@@ -217,7 +262,7 @@ class LemmeHelpYou(Action):
         regenerate_energy(self, self.mem.master, 10, True)
         if self.main_target is not self.unit:
             self.main_target.action_advance(self.main_target.runner_data.distance)
-        MemsSupport(self, self.main_target).add()
+        MemsSupport(self, self.main_target).apply()
 
 
 class RMC(RemembranceCharacter):
@@ -237,7 +282,6 @@ class RMC(RemembranceCharacter):
         if stats is None:
             stats = data.base_stats.deepcopy()
         super().__init__("Trailblazer", "RMC", stats, team, basic_level, skill_level, ult_level, talent_level, memosprite_skill_level, memosprite_talent_level, eidolon_level, trace_level)
-        self.mem_summoned = False
         self.e2_enabled = True
         RMCAP(self, self, False).add()
         UltActivator(self, RMCUltProvider(self, self, False)).add()
@@ -294,7 +338,7 @@ class RMC(RemembranceCharacter):
             return
         if (mem_tracer := self.get_mod(MemTracer)) is None:
             return
-        mem_tracer.sprite.regenerate_energy(data.e4_mem_energy)
+        mem_tracer.mem.regenerate_energy(data.e4_mem_energy)
 
     def on_damage(self, event: EventDamage):
         if not self.check_eidolon(6):
@@ -342,7 +386,7 @@ class Skill(Action):
         self.unit.team.cost_skill_point(self, 1)
         self.add_target(self.unit)
         if mem_tracer := self.unit.get_mod(MemTracer):
-            mem = mem_tracer.sprite
+            mem = mem_tracer.mem
             for control in mem.get_mods(Control):
                 control.dispel(self)
             Heal(self, self.unit, mem, HealFlag.skill, MaxHPPercentMultipier(self.heal_percent)).deal()
@@ -363,7 +407,7 @@ class Ult(Action):
         assert isinstance(self.unit, RMC)
         self.unit.status[Energy, self] -= 160
         if mem_tracer := self.unit.get_mod(MemTracer):
-            mem = mem_tracer.sprite
+            mem = mem_tracer.mem
             for control in mem.get_mods(Control):
                 control.dispel(self)
         else:
@@ -405,7 +449,7 @@ class MemActionProvider(ActionProvider):
             return [LemmeHelpYou(self.unit, ally) for ally in self.unit.select_allies()]
 
 
-class ForceAttack(ActionSelector):
+class ForceAttackSelector(ActionSelector):
     def __init__(self, unit: Unit) -> None:
         super().__init__(ForceAttackController(), unit, -1)
 

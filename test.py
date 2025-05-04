@@ -3,7 +3,7 @@ import game
 import hsr
 from game.events import EventActionEnd, EventEnterBattle, EventNodeStart, EventTurn, EventTurnEnd
 from game.stats import HP, Energy
-from hsr import characters, enemies, multipiers, units
+from hsr import characters, enemies, multipiers
 from hsr.events import EventDamage
 
 
@@ -60,14 +60,12 @@ controller = console.ConsoleController()
 
 
 def setup_test(event: EventEnterBattle):
-    event.unit.stats += game.Stats(HP(increase=10.0, exclusive_flag=game.stats.ConvertFlag.convert))
+    # event.unit.stats += game.Stats(HP(increase=10.0, exclusive_flag=game.stats.ConvertFlag.convert))
     event.unit.status[HP] = event.unit.stats[HP]
     event.unit.status[Energy] = 0.5 * event.unit.stats[Energy]
     console.init_indicators(event.unit)
-    if not isinstance(event.unit, units.Enemy):
+    if not isinstance(event.unit, enemies.Enemy):
         game.ActionSelector(controller, event.unit).add()
-    else:
-        event.unit.stats += game.Stats(game.stats.SPD(decrease=0.75))
 
 
 def main():

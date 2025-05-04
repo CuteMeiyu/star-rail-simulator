@@ -7,11 +7,11 @@ from .debuffs import DoTDebuff
 from .debuffs import Entanglement as EntangleBase
 from .debuffs import Frozen as FrozenBase
 from .debuffs import Imprisonment as ImprisonBase
+from .enemies import Enemy
 from .events import EventWeaknessBreak
 from .multipier import Multipier
 from .priority import Priority
 from .statusmanager import Damage, DamageFlag, ToughnessDamage
-from .units import Enemy
 
 
 class MaxHPPercentMultipier(Multipier[Damage]):

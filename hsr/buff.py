@@ -61,11 +61,10 @@ class Buff(Mod):
         self.max_stack = max_stack
         self.stacks = min(max_stack, 1)
         self.dispelable = dispelable
+        self._call_by_apply = False
 
     def add(self):
-        if exist := self.get_stack_buff():
-            exist.stack(self)
-            return
+        assert self._call_by_apply
         super().add()
         trigger(EventBuffAdd(self))
 
@@ -73,6 +72,14 @@ class Buff(Mod):
         self._keep_ref = None
         super().remove()
         trigger(EventBuffRemove(self))
+
+    def apply(self):
+        if exist := self.get_stack_buff():
+            exist.stack(self)
+        else:
+            self._call_by_apply = True
+            self.add()
+            self._call_by_apply = False
 
     def tick(self):
         self.duration -= 1
@@ -134,11 +141,6 @@ class Debuff(Buff, Calculator):
             EffectRESMultipier(),
         )
 
-    @deprecated("Use `.apply()` for Effect RES.")
-    def add(self):
-        """Add debuff ignore Effect RES"""
-        return super().add()
-
     def calc(self):
         with self.source_stats.temp(flag=self.debuff_flag):
             with self.target_stats.temp(flag=self.debuff_flag):
@@ -156,7 +158,7 @@ class Debuff(Buff, Calculator):
         if not self.is_hit():
             trigger(EventDebuffResistant(self))
             return
-        self.add()
+        super().apply()
 
 
 class BaseHitRateMultipier(Multipier[Debuff]):
