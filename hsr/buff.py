@@ -2,8 +2,6 @@ import random
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
-from typing_extensions import deprecated
-
 from game import Event, Mod, Source, Unit, UnitNode, listen, trigger
 from game.events import EventTurn, EventTurnEnd
 from game.stats import *
