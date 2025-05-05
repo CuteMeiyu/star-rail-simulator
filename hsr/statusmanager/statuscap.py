@@ -39,7 +39,7 @@ class BreakProtection(Mod):
 
 
 def _on_status_change(event: EventStatusChange):
-    if not isinstance(event.current, float | int):
+    if not isinstance(event.current, float | int) or isinstance(event.current, bool):
         return
     max_status = event.unit.stats[event.stat_type]
     if event.current > max_status:
