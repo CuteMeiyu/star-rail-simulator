@@ -121,7 +121,7 @@ class Passive(Mod):
 
     def on_damage(self, event: EventDamage):
         assert isinstance(self.unit, Character)
-        if event.damage.unit is not self.unit:
+        if event.damage.source_unit is not self.unit:
             return
         if not isinstance(event.damage.source, Action):
             return
@@ -146,7 +146,7 @@ class Basic(Action):
         if passive is not None:
             passive.pop()
         self.add_target(self.main_target)
-        deal_damage(self, self.unit, self.main_target, self.scale, 10, DamageFlag.basic, ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, self.scale, 10, self.flag | ElementFlag.quantum)
         regenerate_energy(self, self.unit, 20, True)
         if self.unit.get_mod(AutarkyBuff):
             Autarky(self, self.unit, self.main_target).chain()
@@ -182,9 +182,9 @@ class EnhausedBasic(Action):
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
-        deal_damage(self, self.unit, self.main_target, self.main_scale, 20, DamageFlag.basic, ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, self.main_scale, 20, self.flag | ElementFlag.quantum)
         for target in self.minor_targets:
-            deal_damage(self, self.unit, target, self.minor_scale, 10, DamageFlag.basic, ElementFlag.quantum)
+            deal_damage(self, self.unit, target, self.minor_scale, 10, self.flag | ElementFlag.quantum)
         regenerate_energy(self, self.unit, 20, True)
         hidden_hand = self.unit.get_mod(HiddenHand)
         if hidden_hand is not None:
@@ -237,7 +237,7 @@ class Autarky(Action):
     def run(self):
         assert self.main_target is not None
         self.add_target(self.main_target)
-        deal_damage(self, self.unit, self.main_target, self.bind.scale, 10, DamageFlag.follow_up, ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, self.bind.scale, 10, self.flag | ElementFlag.quantum)
 
 
 class EnhausedAutarky(Action):
@@ -252,9 +252,9 @@ class EnhausedAutarky(Action):
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
-        deal_damage(self, self.unit, self.main_target, self.bind.main_scale, 20, DamageFlag.follow_up, ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, self.bind.main_scale, 20, self.flag | ElementFlag.quantum)
         for target in self.minor_targets:
-            deal_damage(self, self.unit, target, self.bind.minor_scale, 10, DamageFlag.follow_up, ElementFlag.quantum)
+            deal_damage(self, self.unit, target, self.bind.minor_scale, 10, self.flag | ElementFlag.quantum)
 
 
 class Skill(Action):
@@ -292,7 +292,7 @@ class Ult(Action):
         for enemy in self.unit.select_enemies():
             self.add_target(enemy)
         for target in self.targets:
-            deal_damage(self, self.unit, target, self.scale, 20, DamageFlag.ult, ElementFlag.quantum)
+            deal_damage(self, self.unit, target, self.scale, 20, self.flag | ElementFlag.quantum)
         regenerate_energy(self, self.unit, 5, True)
         passive = self.unit.get_mod(Passive)
         if passive is not None:

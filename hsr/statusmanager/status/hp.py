@@ -1,11 +1,10 @@
 import random
 from dataclasses import dataclass
 
-from game import Event, Source, Stat, Stats, Unit, trigger
+from game import Event, FlexFlag, MixFlag, Source, Stat, Stats, Unit, trigger
 from game.stats import *
 
-from ...multipier import Calculator, Multipier, clamp
-from ..flags import DamageFlag, HealFlag
+from ...multipier import Multipier, SourceTargetCalculator, clamp
 
 
 @dataclass
@@ -18,38 +17,24 @@ class EventHeal(Event):
     heal: "Heal"
 
 
-class Damage(Calculator, Source):
-    def __init__(self, source: Source | None, unit: Unit, target: Unit, flag: DamageFlag, element: ElementFlag, *multipiers: Multipier) -> None:
-        super().__init__()
+class Damage(SourceTargetCalculator, Source):
+    def __init__(self, source: Source | None, source_unit: Unit, target_unit: Unit, flag: None | FlexFlag | MixFlag, *multipiers: Multipier) -> None:
+        super().__init__(source_unit, target_unit, flag, *multipiers)
         Source.__init__(self, source)
-        self.unit = unit
-        self.target = target
-        self.source_stats = Stats()
-        self.target_stats = Stats()
-        self.source_stats += self.unit.stats
-        self.target_stats += self.target.stats
-        self.flag = flag
-        self.element = element
         self.add_multipiers(
-            *multipiers,
             DefenseMultipier(),
             ResistanceMultipier(),
             VulnerabilityMultipier(),
             DMGMitigationMultipier(),
-            BrokenMultipier(self.target),
+            BrokenMultipier(self.target_unit),
         )
-
-    def calc(self):
-        with self.source_stats.temp(flag=self.flag | self.element):
-            with self.target_stats.temp(flag=self.flag | self.element):
-                return super().calc()
 
     def deal(self):
         trigger(EventDamage(self))
         amount = self.calc()
         if amount <= 0:
             return
-        self.target.status[HP, self] -= amount
+        self.target_unit.status[HP, self] -= amount
 
 
 class BaseDamageMultipier(Multipier[Damage]):
@@ -116,33 +101,20 @@ class BrokenMultipier(Multipier[Damage]):
         return self.value
 
 
-class Heal(Calculator, Source):
-    def __init__(self, source: Source | None, unit: Unit, target: Unit, flag: HealFlag, *multipiers: Multipier) -> None:
-        super().__init__()
+class Heal(SourceTargetCalculator, Source):
+    def __init__(self, source: Source | None, unit: Unit, target: Unit, flag: None | FlexFlag | MixFlag, *multipiers: Multipier) -> None:
+        super().__init__(unit, target, flag, *multipiers)
         Source.__init__(self, source)
-        self.unit = unit
-        self.target = target
-        self.source_stats = Stats()
-        self.target_stats = Stats()
-        self.source_stats += self.unit.stats
-        self.target_stats += self.target.stats
-        self.flag = flag
         self.add_multipiers(
-            *multipiers,
             OutgoingHealingBoostMultipier(),
         )
-
-    def calc(self):
-        with self.source_stats.temp(flag=self.flag):
-            with self.target_stats.temp(flag=self.flag):
-                return super().calc()
 
     def deal(self):
         trigger(EventHeal(self))
         amount = self.calc()
         if amount <= 0:
             return
-        self.target.status[HP, self] += amount
+        self.target_unit.status[HP, self] += amount
 
 
 class OutgoingHealingBoostMultipier(Multipier[Heal]):
@@ -151,13 +123,13 @@ class OutgoingHealingBoostMultipier(Multipier[Heal]):
 
 
 class TrueDamage(Damage):
-    def __init__(self, source: Source | None, unit: Unit, target: Unit, amount: float) -> None:
-        super().__init__(source, unit, target, DamageFlag(), element=ElementFlag())
+    def __init__(self, source: Source | None, source_unit: Unit, target_unit: Unit, amount: float, flag: None | FlexFlag | MixFlag) -> None:
+        super().__init__(source, source_unit, target_unit, flag)
         self.clear_multipier()
-        self.add_multipier(FixedAmountMultipier(amount))
+        self.add_multipier(LiteralAmountMultipier(amount))
 
 
-class FixedAmountMultipier(Multipier):
+class LiteralAmountMultipier(Multipier):
     def __init__(self, amount: float) -> None:
         super().__init__()
         self.amount = amount

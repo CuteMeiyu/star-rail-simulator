@@ -7,7 +7,7 @@ from .statusmanager import Damage, regenerate_energy
 
 def _on_death(event: EventDeath):
     if isinstance(event.node.source, Damage):
-        source_unit = event.node.source.unit
+        source_unit = event.node.source.source_unit
     else:
         source_unit = event.node.get_source(Unit)
         if source_unit is None:

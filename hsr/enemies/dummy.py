@@ -15,11 +15,15 @@ class Dummy(Enemy):
             "Dummy",
             "Dummy",
             Stats(
+                Level(95),
                 ATK(1000),
+                DEF(1150),
                 HP(10000),
                 SPD(120),
                 Toughness(60),
-                Weakness(ElementFlag.quantum | ElementFlag.fire | ElementFlag.lightning),
+                Weakness(ElementFlag.ice | ElementFlag.quantum | ElementFlag.physical),
+                DMG_RES(0.2, ElementFlag.ice),
+                DMG_RES(0.4, ElementFlag.quantum),
             ),
             team,
             True,
@@ -37,7 +41,7 @@ class A1(Action):
     def run(self):
         assert self.main_target is not None
         self.add_target(self.main_target)
-        deal_damage(self, self.unit, self.main_target, 1.0, 0.0, DamageFlag(), ElementFlag.ice)
+        deal_damage(self, self.unit, self.main_target, 0.25, 0.0, self.flag | ElementFlag.ice)
         regenerate_energy(self, self.main_target, 5, True)
 
 

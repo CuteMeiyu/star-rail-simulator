@@ -6,7 +6,7 @@ from .status.hp import (
     DamageBoostMultipier,
     DefenseMultipier,
     DMGMitigationMultipier,
-    FixedAmountMultipier,
+    LiteralAmountMultipier,
     OutgoingHealingBoostMultipier,
     ResistanceMultipier,
     VulnerabilityMultipier,

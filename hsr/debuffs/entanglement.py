@@ -37,7 +37,15 @@ class Entanglement(Control):
         return super().remove()
 
     def dot(self, percent=1.0):
-        Damage(self, self.source_unit, self.unit, DamageFlag.additional, ElementFlag.quantum, *self.damage_multipiers, DoTPercentMultipier(percent), StackMultipier(max(self.stacks, 1))).deal()
+        Damage(
+            self,
+            self.source_unit,
+            self.unit,
+            self.flag | DamageFlag.additional | ElementFlag.quantum,
+            *self.damage_multipiers,
+            DoTPercentMultipier(percent),
+            StackMultipier(max(self.stacks, 1)),
+        ).deal()
 
     def on_action_end(self, event: EventActionEnd):
         if ActionFlag.attack not in event.action.flag:

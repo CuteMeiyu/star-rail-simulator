@@ -266,8 +266,12 @@ class _FlagStat(Stat[_T_FlexFlag], _Generic[_T_FlexFlag]):
         self.value |= other.value
         return self
 
-    def has_intersection(self, flag: _T_FlexFlag):
-        return self.value.value & flag.value > 0
+    def has_intersection(self, flag: _T_FlexFlag | _MixFlag):
+        if isinstance(flag, _MixFlag):
+            return len(flag & self.value) > 0
+        if type(self.value) is type(flag):
+            return self.value.value & flag.value > 0
+        return False
 
     def get_value(self) -> _T_FlexFlag:
         return self.value
@@ -388,13 +392,14 @@ class Stats:
     def temp(self, stats: "Stats | None" = None, flag: _FlexFlag | _MixFlag | None = None):
         if stats is not None:
             self += stats
+        backup = self._temp_flag
         self._temp_flag = flag
         try:
             yield
         finally:
             if stats is not None:
                 self -= stats
-            self._temp_flag = None
+            self._temp_flag = backup
 
     def __iadd__(self, other: _Self) -> _Self:
         self.children.append(other)

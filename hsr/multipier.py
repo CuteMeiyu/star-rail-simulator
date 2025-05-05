@@ -1,6 +1,8 @@
 import math
 from typing import Generic, TypeVar
 
+from game import FlexFlag, MixFlag, Source, Stats, Unit
+
 
 def clamp(value: float, lower_bound: float, upper_bound: float):
     return min(max(lower_bound, value), upper_bound)
@@ -52,3 +54,21 @@ class Calculator:
         return math.prod(multipier.get(self) for multipier in self.multipiers)
 
     def deal(self): ...
+
+
+class SourceTargetCalculator(Calculator):
+    def __init__(self, source_unit: Unit, target_unit: Unit, flag: None | FlexFlag | MixFlag, *multipiers: Multipier) -> None:
+        super().__init__()
+        self.source_unit = source_unit
+        self.target_unit = target_unit
+        self.source_stats = Stats()
+        self.target_stats = Stats()
+        self.source_stats += self.source_unit.stats
+        self.target_stats += self.target_unit.stats
+        self.flag = MixFlag() if flag is None else MixFlag(flag)
+        self.add_multipiers(*multipiers)
+
+    def calc(self):
+        with self.source_stats.temp(flag=self.flag):
+            with self.target_stats.temp(flag=self.flag):
+                return super().calc()

@@ -29,7 +29,15 @@ class Frozen(Control):
         self.damage_multipiers = multipiers
 
     def dot(self, percent=1.0):
-        Damage(self, self.source_unit, self.unit, DamageFlag.additional, ElementFlag.ice, *self.damage_multipiers, DoTPercentMultipier(percent), StackMultipier(max(self.stacks, 1))).deal()
+        Damage(
+            self,
+            self.source_unit,
+            self.unit,
+            self.flag | DamageFlag.additional | ElementFlag.ice,
+            *self.damage_multipiers,
+            DoTPercentMultipier(percent),
+            StackMultipier(max(self.stacks, 1)),
+        ).deal()
 
 
 class FrozenDamage(UnitNode):

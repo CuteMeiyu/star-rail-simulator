@@ -100,20 +100,33 @@ class ConsoleController(Controller):
         return cmd_dict[cmd]
 
 
-class StatusSuffix(Suffix):
-    def __init__(self, unit: Unit, stat_type: type[Stat], priority=0) -> None:
+class NumericSuffix(Suffix):
+    def __init__(self, unit: Unit, format=".0f", priority=0) -> None:
         super().__init__(unit, priority)
-        self.stat_type = stat_type
-        self.previous = unit.status[stat_type]
+        self.previous: float | None = None
+        self.no_change = "{:" + format + "}"
+        self.changed = "{:" + format + "}({:+" + format + "})"
 
-    def string(self):
-        current = self.unit.status[self.stat_type]
-        if not math.isclose(self.previous, current):
-            result = f"{current:.0f}({current-self.previous:+.0f})"
+    def get_value(self) -> float | int: ...
+    def string(self) -> str:
+        current = self.get_value()
+        if self.previous is None:
+            delta = 0.0
         else:
-            result = str(int(current))
+            delta = current - self.previous
         self.previous = current
-        return result
+        if math.isclose(delta, 0):
+            return self.no_change.format(current)
+        return self.changed.format(current, delta)
+
+
+class StatusSuffix(NumericSuffix):
+    def __init__(self, unit: Unit, stat_type: type[Stat], priority=0) -> None:
+        super().__init__(unit, ".0f", priority)
+        self.stat_type = stat_type
+
+    def get_value(self) -> float | int:
+        return self.unit.status[self.stat_type]
 
 
 class ModSuffix(Suffix):

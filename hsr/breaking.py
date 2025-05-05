@@ -52,8 +52,8 @@ class ImprisonmentScaleMultipier(Multipier):
 
 
 class BreakDoTDebuff(DoTDebuff):
-    def __init__(self, name: str, source_unit: Unit, target_unit: Unit, debuff_flag: DebuffFlag, damage_type: ElementFlag, *multipiers: Multipier, max_stack=0) -> None:
-        super().__init__(source_unit, name, source_unit, target_unit, 2, debuff_flag, 1.5, 0.0, DamageFlag.dot, damage_type, *multipiers, BreakEffectMultipier(), max_stack=max_stack)
+    def __init__(self, name: str, source_unit: Unit, target_unit: Unit, debuff_flag: DebuffFlag, element: ElementFlag, *multipiers: Multipier, max_stack=0) -> None:
+        super().__init__(source_unit, name, source_unit, target_unit, 2, debuff_flag, 1.5, 0.0, element, *multipiers, BreakEffectMultipier(), max_stack=max_stack)
 
 
 class Bleed(BreakDoTDebuff):
@@ -102,16 +102,16 @@ class Imprisonment(ImprisonBase):
 
 
 def _deal_breaking_damage(source_unit: Unit, target_unit: Unit, element: ElementFlag, scale: float):
-    Damage(source_unit, source_unit, target_unit, DamageFlag.breaking, element, BaseBreakDamageMultipier(scale), ToughnessMultipier(), BreakEffectMultipier()).deal()
+    Damage(source_unit, source_unit, target_unit, DamageFlag.breaking | element, BaseBreakDamageMultipier(scale), ToughnessMultipier(), BreakEffectMultipier()).deal()
 
 
 def _on_weakness_break(event: EventWeaknessBreak):
     if event.source is None:
         return
     if isinstance(event.source, ToughnessDamage):
-        source_unit = event.source.unit
-        target_unit = event.source.target
-        element = event.source.element
+        source_unit = event.source.source_unit
+        target_unit = event.source.target_unit
+        element = event.source.flag[ElementFlag]
         source_stats = event.source.source_stats
     else:
         source_unit = event.source.get_source(Unit)

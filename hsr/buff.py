@@ -2,11 +2,11 @@ import random
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
-from game import Event, Mod, Source, Unit, UnitNode, listen, trigger
+from game import Event, MixFlag, Mod, Source, Unit, UnitNode, listen, trigger
 from game.events import EventTurn, EventTurnEnd
 from game.stats import *
 
-from .multipier import Calculator, Multipier
+from .multipier import Multipier, SourceTargetCalculator
 from .priority import Priority
 
 
@@ -106,7 +106,7 @@ class Buff(Mod):
         return None
 
 
-class Debuff(Buff, Calculator):
+class Debuff(Buff, SourceTargetCalculator):
     def __init__(
         self,
         source: Source | None,
@@ -123,26 +123,14 @@ class Debuff(Buff, Calculator):
         priority=0,
     ) -> None:
         super().__init__(source, name, target_unit, duration, tick_type, dispelable, max_stack, priority)
-        self.debuff_flag = debuff_flag
-        Calculator.__init__(self)
-        self.source_unit = source_unit
+        SourceTargetCalculator.__init__(self, source_unit, target_unit, debuff_flag, BaseHitRateMultipier(), EffectHitMultipier(), EffectRESMultipier())
         self.base_chance = base_chance
         self.fixed_chance = fixed_chance
         self.rng = random.random()
-        self.source_stats = Stats()
-        self.target_stats = Stats()
-        self.source_stats += source_unit.stats
-        self.target_stats += target_unit.stats
-        self.add_multipiers(
-            BaseHitRateMultipier(),
-            EffectHitMultipier(),
-            EffectRESMultipier(),
-        )
 
-    def calc(self):
-        with self.source_stats.temp(flag=self.debuff_flag):
-            with self.target_stats.temp(flag=self.debuff_flag):
-                return super().calc()
+    @property
+    def debuff_flag(self):
+        return self.flag[DebuffFlag]
 
     def is_hit(self):
         if self.rng < self.calc():

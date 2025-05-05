@@ -15,11 +15,11 @@ def damage_print(event: EventDamage):
     output = []
     output.append(f"{event.damage.__class__.__name__}:")
     output.append(getattr(event.damage.source, "name") if hasattr(event.damage.source, "name") else event.damage.source.__class__.__name__)
-    output.append(event.damage.unit.name)
+    output.append(event.damage.source_unit.name)
     output.append(f"{event.damage.calc():.0f}")
     if (cm := event.damage.get_multipier(multipiers.CritMultipier)) and cm.crit:
         output.append("CRIT!")
-    output.append(event.damage.target.name)
+    output.append(event.damage.target_unit.name)
     print(*output)
 
 

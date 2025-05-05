@@ -37,20 +37,18 @@ class DoTDebuff(Debuff):
         debuff_flag: DebuffFlag,
         base_chance: float,
         fixed_chance: float,
-        damage_flag: DamageFlag,
-        damage_type: ElementFlag,
+        element: ElementFlag,
         *multipiers: Multipier,
         dispelable=True,
         max_stack=0,
         priority=0,
     ) -> None:
         super().__init__(source, name, source_unit, target_unit, duration, TickType.start_end, debuff_flag, base_chance, fixed_chance, dispelable, max_stack, priority)
-        self.damage_flag = damage_flag
-        self.damage_type = damage_type
+        self.element = element
         self.damage_multipiers = multipiers
 
     def dot(self, percent=1.0):
-        Damage(self, self.source_unit, self.unit, self.damage_flag, self.damage_type, *self.damage_multipiers, DoTPercentMultipier(percent), StackMultipier(max(self.stacks, 1))).deal()
+        Damage(self, self.source_unit, self.unit, self.flag | self.element, *self.damage_multipiers, DoTPercentMultipier(percent), StackMultipier(max(self.stacks, 1))).deal()
 
 
 class DoT(UnitNode):
