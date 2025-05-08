@@ -9,7 +9,7 @@ from game.stats import *
 from ..buff import Buff, TickType
 from ..data.characters import qingque as data
 from ..events import EventDamage
-from ..statusmanager import DamageFlag, deal_damage, regenerate_energy
+from ..statusmanager import deal_damage, regenerate_energy
 from ..turn import EventUnitReady, Turn
 from ..ult import UltActivator
 from .character import Character
@@ -28,7 +28,7 @@ class Qingque(Character):
         trace_level=3,
     ) -> None:
         if stats is None:
-            stats = data.base_stats.deepcopy()
+            stats = data.generate_base_stats(80, 6)
         super().__init__("Qingque", "QQ", stats, team, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_level)
         Passive(self).add()
         BasicSkillProvider(self).add()

@@ -27,23 +27,29 @@ class Priority:
         turn = auto_positive()
 
     class Event:
-        # Negative
-        first = auto_negative()
+        # ActionEnd
+        over_turn = auto_negative()
+
+        # StatusChange
         status_cap = auto_negative()
-        weakness_break = auto_negative()
+
+        # WeaknessBreak
+        break_debuff = auto_negative()
+
+        # Death
         killing_energy = auto_negative()
 
-        # Positive
-        # Turn Event
+        # Turn
         frozen_dot = auto_positive()
         entanglement_dot = auto_positive()
         dot = auto_positive()
         unfreeze = auto_positive()
         buff_tick = auto_positive()
         weakness_restore = auto_positive()
-        # Damage Event
+
+        # Damage
         true_damage = auto_positive()
-        last = auto_positive()
+        damage_print = auto_positive()
 
     @staticmethod
     def auto_positive():

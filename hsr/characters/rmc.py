@@ -280,7 +280,7 @@ class RMC(RemembranceCharacter):
         trace_level=3,
     ) -> None:
         if stats is None:
-            stats = data.base_stats.deepcopy()
+            stats = data.generate_base_stats(80, 6)
         super().__init__("Trailblazer", "RMC", stats, team, basic_level, skill_level, ult_level, talent_level, memosprite_skill_level, memosprite_talent_level, eidolon_level, trace_level)
         self.e2_enabled = True
         RMCAP(self, self, False).add()
@@ -352,13 +352,17 @@ class RMC(RemembranceCharacter):
         event.damage.source_stats.locks.append(CRIT_Rate(data.e6_crit_rate))
 
     def generate_memosprite_stats(self):
-        stats = data.mem_base_stats.deepcopy()
-        stats.stats.append(Level(self.stats[Level]))
-        hp_stat = self.stats.get_stat(HP, exclusive_flag=ConvertFlag.convert)
-        base_hp = data.talent_hp[self.talent_level - 1][0] * hp_stat.get_base()
-        flat_hp = data.talent_hp[self.talent_level - 1][1] + hp_stat.get_value() - hp_stat.get_base()
-        stats.stats.append(HP(base=base_hp, flat=flat_hp))
-        return stats
+        return Stats(
+            HP(self.stats.get_stat(HP, exclusive_flag=ConvertFlag.convert).get_base() * data.talent_hp[self.talent_level - 1][0], flat=data.talent_hp[self.talent_level - 1][1]),
+            ATK(self.stats.get_stat(ATK, exclusive_flag=ConvertFlag.convert).get_base()),
+            DEF(self.stats.get_stat(DEF, exclusive_flag=ConvertFlag.convert).get_base()),
+            SPD(130),
+            Aggro(100),
+            CRIT_Rate(0.05),
+            CRIT_DMG(0.5),
+            Energy(0),
+            Level(self.stats[Level]),
+        )
 
 
 class Basic(Action):

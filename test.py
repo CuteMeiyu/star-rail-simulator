@@ -86,10 +86,10 @@ def main():
 
 
 game.listen(game.Event, event_print)
-game.listen(EventDamage, damage_print, hsr.Priority.Event.last)
+game.listen(EventDamage, damage_print, hsr.Priority.Event.damage_print)
 game.listen(EventNodeStart, node_print)
 game.listen(EventActionEnd, attack_print)
-game.listen(EventActionEnd, over_turn_action_select, hsr.Priority.Event.first)
+game.listen(EventActionEnd, over_turn_action_select, hsr.Priority.Event.over_turn)
 game.listen(EventTurn, actor_indicator_add)
 game.listen(EventTurnEnd, actor_indicator_remove)
 game.listen(EventEnterBattle, setup_test)

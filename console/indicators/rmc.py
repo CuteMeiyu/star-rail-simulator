@@ -1,5 +1,3 @@
-import math
-
 from game.combat import Unit
 from hsr.characters.rmc import Mem, MemsSupport
 
@@ -10,7 +8,7 @@ ModSuffix.table[MemsSupport] = "♥"
 
 class MemEnergySuffix(NumericSuffix):
     def __init__(self, unit: Unit, priority=0) -> None:
-        super().__init__(unit, ".0f", priority)
+        super().__init__(unit, priority)
 
     def get_value(self) -> float | int:
         assert isinstance(self.unit, Mem)

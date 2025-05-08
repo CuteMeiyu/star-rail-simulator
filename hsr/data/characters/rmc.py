@@ -1,4 +1,6 @@
-from game import stats
+from game.stats import ElementFlag, PathFlag
+
+from ..utils import generate_base_stats as _generate_base_stats
 
 talent_hp = [
     [0.5, 400.0],
@@ -99,27 +101,74 @@ t3_energy_per = 10.0
 t3_true_dmg_scale = 0.02
 t3_true_dmg_scale_max = 0.2
 
-base_stats = stats.Stats(
-    stats.HP(1047.8),
-    stats.ATK(543.31),
-    stats.DEF(630.63),
-    stats.SPD(103),
-    stats.Energy(160),
-    stats.Aggro(100),
-    stats.CRIT_Rate(0.05),
-    stats.CRIT_DMG(0.5),
-    stats.Level(80),
-    stats.Path(stats.PathFlag.remembrance),
-    stats.CombatType(stats.ElementFlag.ice),
-)
 
-mem_base_stats = stats.Stats(
-    stats.ATK(543.31),
-    stats.DEF(630.63),
-    stats.SPD(130),
-    stats.Aggro(100),
-    stats.CRIT_Rate(0.05),
-    stats.CRIT_DMG(0.5),
-    stats.Path(stats.PathFlag.remembrance),
-    stats.CombatType(stats.ElementFlag.ice),
-)
+ascesions = [
+    {
+        "hp": {"base": 142.56, "step": 7.128},
+        "atk": {"base": 73.92, "step": 3.696},
+        "def": {"base": 85.8, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+    {
+        "hp": {"base": 199.584, "step": 7.128},
+        "atk": {"base": 103.488, "step": 3.696},
+        "def": {"base": 120.12, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+    {
+        "hp": {"base": 256.608, "step": 7.128},
+        "atk": {"base": 133.056, "step": 3.696},
+        "def": {"base": 154.44, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+    {
+        "hp": {"base": 313.632, "step": 7.128},
+        "atk": {"base": 162.624, "step": 3.696},
+        "def": {"base": 188.76, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+    {
+        "hp": {"base": 370.656, "step": 7.128},
+        "atk": {"base": 192.192, "step": 3.696},
+        "def": {"base": 223.08, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+    {
+        "hp": {"base": 427.68, "step": 7.128},
+        "atk": {"base": 221.76, "step": 3.696},
+        "def": {"base": 257.4, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+    {
+        "hp": {"base": 484.704, "step": 7.128},
+        "atk": {"base": 251.328, "step": 3.696},
+        "def": {"base": 291.72, "step": 4.29},
+        "spd": {"base": 103, "step": 0},
+        "taunt": {"base": 100, "step": 0},
+        "crit_rate": {"base": 0.05, "step": 0},
+        "crit_dmg": {"base": 0.5, "step": 0},
+    },
+]
+
+
+def generate_base_stats(level: int, ascesion_level: int):
+    data = ascesions[ascesion_level]
+    return _generate_base_stats(data, level, 160, PathFlag.remembrance, ElementFlag.ice)

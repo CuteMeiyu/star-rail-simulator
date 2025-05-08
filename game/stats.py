@@ -55,6 +55,15 @@ class Stat(_Generic[_T]):
             return False
         return True
 
+    def __repr__(self) -> str:
+        string = f"{type(self).__name__}({self.get_value()}"
+        if len(self.flag) > 0:
+            string += f", flag={self.flag}"
+        if len(self.exclusive_flag) > 0:
+            string += f", exclusive={self.exclusive_flag}"
+        string += ")"
+        return string
+
     def __iadd__(self, other: _Self) -> _Self: ...
     def get_value(self) -> _T: ...
 
@@ -73,6 +82,23 @@ class _ComplexStat(Stat[float]):
         self.increase += other.get_increase()
         self.decrease += other.get_decrease()
         return self
+
+    def __repr__(self) -> str:
+        string = f"{type(self).__name__}({self.get_value()}"
+        if self.get_base() > 0:
+            string += f", base={self.get_base()}"
+        if self.get_flat() > 0:
+            string += f", flat={self.get_flat()}"
+        if self.get_increase() > 0:
+            string += f", increase={self.get_increase()}"
+        if self.get_decrease() > 0:
+            string += f", decrease={self.get_decrease()}"
+        if len(self.flag) > 0:
+            string += f", flag={self.flag}"
+        if len(self.exclusive_flag) > 0:
+            string += f", exclusive={self.exclusive_flag}"
+        string += ")"
+        return string
 
     def get_base(self):
         return self.base
@@ -360,12 +386,33 @@ class Stats:
         self.comment = comment
         self._temp_flag: _FlexFlag | _MixFlag | None = None
 
+    def __getitem__(self, stat_type: type[Stat[_T]]):
+        return self.get(stat_type)
+
+    @property
+    def all_stats(self):
+        packs: list[tuple[type[Stat], _MixFlag, _MixFlag]] = []
+        stack: list[Stats] = [self]
+        while len(stack) > 0:
+            child = stack.pop()
+            for stat in child.stats:
+                pack = type(stat), stat.flag, stat.exclusive_flag
+                if pack not in packs:
+                    packs.append(pack)
+            stack.extend(child.children)
+        packs.sort(key=lambda p: p[0].__name__)
+        results: list[Stat] = []
+        for stat_type, flag, exclusive_flag in packs:
+            results.append(self.get_stat(stat_type, flag=flag, exclusive_flag=exclusive_flag))
+        return results
+
     def get_stat(self, stat_type: type[_T_Stat], no_child=False, **kwargs: _Any) -> _T_Stat:
         for lock in self.locks:
             if type(lock) is stat_type:
                 return lock
-        if "flag" in kwargs and self._temp_flag is not None:
-            kwargs["flag"] |= self._temp_flag
+        if "flag" in kwargs:
+            if self._temp_flag is not None:
+                kwargs["flag"] |= self._temp_flag
         else:
             kwargs["flag"] = self._temp_flag
         stat = stat_type(**kwargs)
@@ -381,9 +428,6 @@ class Stats:
 
     def get(self, stat_type: type[Stat[_T]], no_child=False, **kwargs: _Any) -> _T:
         return self.get_stat(stat_type, no_child, **kwargs).get_value()
-
-    def __getitem__(self, stat_type: type[Stat[_T]]):
-        return self.get(stat_type)
 
     def deepcopy(self):
         return _deepcopy(self)

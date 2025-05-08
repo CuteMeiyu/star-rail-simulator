@@ -101,7 +101,7 @@ class ConsoleController(Controller):
 
 
 class NumericSuffix(Suffix):
-    def __init__(self, unit: Unit, format=".0f", priority=0) -> None:
+    def __init__(self, unit: Unit, priority=0, format=".0f") -> None:
         super().__init__(unit, priority)
         self.previous: float | None = None
         self.no_change = "{:" + format + "}"
@@ -122,7 +122,7 @@ class NumericSuffix(Suffix):
 
 class StatusSuffix(NumericSuffix):
     def __init__(self, unit: Unit, stat_type: type[Stat], priority=0) -> None:
-        super().__init__(unit, ".0f", priority)
+        super().__init__(unit, priority)
         self.stat_type = stat_type
 
     def get_value(self) -> float | int:
