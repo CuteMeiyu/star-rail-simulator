@@ -1,4 +1,6 @@
-from . import breaking, killing, multipiers
+from game import *
+
+from . import breaking, events, killing, multipiers
 from .buff import Buff, Debuff, TickType
 from .characters import Character, Memosprite, MemospriteTracer, RemembranceCharacter
 from .enemies import Enemy
