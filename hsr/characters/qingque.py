@@ -1,10 +1,11 @@
 import random
 
 from game.action import Action, ActionFlag, ActionProvider, MainTargetCondition, WeakAction
-from game.combat import EventBattleStart, EventTurn, Mod, Team, Unit
+from game.combat import EventBattleStart, EventTurn, SourcelessMod, Team, Unit
 from game.event import listen
 from game.source import Source
 from game.stats import *
+from game.stats import Stats
 
 from ..buff import Buff, TickType
 from ..data.characters import qingque as data
@@ -19,20 +20,35 @@ class Qingque(Character):
     def __init__(
         self,
         team: Team,
-        stats: Stats | None = None,
+        ascension=6,
+        level=80,
         basic_level=6,
         skill_level=10,
         ult_level=10,
         talent_level=10,
         eidolon_level=6,
-        trace_level=3,
+        trace_flags: tuple[bool, ...] = (True,) * 3,
+        trace_stats_flags: tuple[bool, ...] = (True,) * 10,
     ) -> None:
-        if stats is None:
-            stats = data.generate_base_stats(80, 6)
-        super().__init__("Qingque", "QQ", stats, team, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_level)
+        super().__init__("Qingque", "QQ", team, ascension, level, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_flags, trace_stats_flags)
         Passive(self).add()
         BasicSkillProvider(self).add()
         UltActivator(self, UltProvider(self)).add()
+
+    def generate_base_stats(self, ascension: int, level: int) -> Stats:
+        return data.generate_basic_stats(ascension, level)
+
+    def get_trace_stats(self, *trace_stats_flags: bool) -> Stats:
+        return data.generate_trace_stats(*trace_stats_flags)
+
+    def set_eidolon(self, e1: bool, e2: bool, e3: bool, e4: bool, e5: bool, e6: bool):
+        if e3:
+            self.ult_level += 2
+            self.talent_level += 2
+        if e5:
+            self.skill_level += 2
+            self.basic_level += 1
+        return super().set_eidolon(e1, e2, e3, e4, e5, e6)
 
 
 class HiddenHand(Buff):
@@ -54,9 +70,9 @@ class HiddenHandAnimation(WeakAction):
         super().__init__("Hidden Hand", unit)
 
 
-class Passive(Mod):
+class Passive(SourcelessMod):
     def __init__(self, unit: Character) -> None:
-        super().__init__(unit, unit)
+        super().__init__(unit)
         self.tiles = []
         self.pool = ["A", "B", "C"]
         self.performed = False
@@ -299,9 +315,9 @@ class Ult(Action):
             passive.cheat()
 
 
-class Technique(Mod):
+class Technique(SourcelessMod):
     def __init__(self, unit: Unit) -> None:
-        super().__init__(unit, unit)
+        super().__init__(unit)
 
     def add(self):
         self.on_battle_start_listener = listen(EventBattleStart, self.on_battle_start)
@@ -320,27 +336,9 @@ class Technique(Mod):
         self.remove()
 
 
-class TraceStats(Mod):
+class Trace1Trigged(SourcelessMod):
     def __init__(self, unit: Unit) -> None:
-        super().__init__(unit, unit)
-        self.stats = Stats(
-            ATK(increase=data.trace_atk_boost),
-            DMG_Boost(data.trace_dmg_boost, ElementFlag.quantum),
-            DEF(increase=data.trace_def_boost),
-        )
-
-    def add(self):
-        self.unit.stats += self.stats
-        return super().add()
-
-    def remove(self):
-        self.unit.stats -= self.stats
-        return super().remove()
-
-
-class Trace1Trigged(Mod):
-    def __init__(self, unit: Unit) -> None:
-        super().__init__(unit, unit)
+        super().__init__(unit)
 
 
 class BasicSkillProvider(ActionProvider):

@@ -1,6 +1,7 @@
 from game import Action, ActionFlag, ActionProvider, ActionSelector, BounceAction, Controller, Source, SourcelessMod, Team, Unit, listen
 from game.events import EventAction, EventEnterBattle, EventStatusChange, EventTurn
 from game.stats import *
+from game.stats import Stats
 
 from ..buff import Buff, TickType
 from ..data.characters import rmc as data
@@ -27,7 +28,7 @@ class Mem(Memosprite):
         self.listener3 = listen(EventDeath, self.on_death)
         for ally in self.team.units:
             FriendsTogether(self, ally).apply()
-        self.regenerate_energy(data.mem_spawn_energy)
+        self.regenerate_energy(data.mem_talent_energy[self.master.memosprite_talent_level - 1])
         index = self.team.units.index(self.master) + 1
         super().add(index)
         if self.master.check_trace(1) and not self.master.get_mod(Trace1Trigged):
@@ -41,7 +42,7 @@ class Mem(Memosprite):
         for ally in self.team.units:
             for buff in ally.get_mods(FriendsTogether):
                 buff.remove()
-        self.master.action_advance(data.mem_despawn_action_advance)
+        self.master.action_advance(data.mem_talent_advance[self.master.memosprite_talent_level - 1])
         return super().remove()
 
     def add_tracer(self):
@@ -56,8 +57,8 @@ class Mem(Memosprite):
             return
         delta = event.current - event.previous
         self.accumulated += delta
-        self.regenerate_energy(self.accumulated // data.talent_energy_per * data.talent_mem_energy)
-        self.accumulated %= data.talent_energy_per
+        self.regenerate_energy(self.accumulated // data.talent_energy_per[self.master.talent_level - 1] * 0.01)
+        self.accumulated %= data.talent_energy_per[self.master.talent_level - 1]
 
     def on_enter_battle(self, event: EventEnterBattle):
         if event.unit.team is not self.team:
@@ -94,8 +95,8 @@ class MemTracer(MemospriteTracer):
 class BaddiesTrouble(BounceAction):
     def __init__(self, unit: Memosprite) -> None:
         super().__init__("Baddies! Trouble!", unit, ActionFlag.attack | ActionFlag.bounce | ActionFlag.aoe)
-        self.bounce_scale = data.mem_attack_dmg_scale[unit.master.memosprite_skill_level - 1][0]
-        self.aoe_scale = data.mem_attack_dmg_scale[unit.master.memosprite_skill_level - 1][1]
+        self.bounce_scale = data.mem_basic_bounce_scale[unit.master.memosprite_skill_level - 1]
+        self.aoe_scale = data.mem_basic_aoe_scale[unit.master.memosprite_skill_level - 1]
 
     @property
     def mem(self):
@@ -104,7 +105,7 @@ class BaddiesTrouble(BounceAction):
         return mem
 
     def run(self):
-        for _ in range(4):
+        for _ in range(data.mem_basic_bounce_count[self.mem.master.memosprite_skill_level - 1]):
             target = self.bounce()
             deal_damage(self, self.unit, target, self.bounce_scale, 5, self.flag | ElementFlag.ice)
             regenerate_energy(self, self.mem.master, 2, True)
@@ -119,8 +120,8 @@ class BaddiesTrouble(BounceAction):
 class FriendsTogether(Buff):
     def __init__(self, source: Mem, unit: Unit) -> None:
         super().__init__(source, "Friends! Together!", unit, 0, TickType.none, False)
-        self.converted_cd = data.mem_talent_crit_dmg[source.master.memosprite_talent_level - 1][0]
-        self.fixed_cd = data.mem_talent_crit_dmg[source.master.memosprite_talent_level - 1][1]
+        self.converted_cd = data.mem_talent_convert_cd[source.master.memosprite_talent_level - 1]
+        self.fixed_cd = data.mem_talent_flat_cd[source.master.memosprite_talent_level - 1]
         crit_dmg = CRIT_DMG(exclusive_flag=ConvertFlag.convert)
         crit_dmg.get_value = self.crit_damage_value
         self.stats = Stats(crit_dmg)
@@ -152,7 +153,7 @@ class MemsSupport(Buff):
             super().__init__(source, "Mem's Support", unit, 3, TickType.start_end)
             mem = self.get_source(Mem)
             assert mem is not None
-            self.base_scale = data.mem_support_scale[mem.master.memosprite_skill_level - 1]
+            self.base_scale = data.mem_skill_scale[mem.master.memosprite_skill_level - 1]
             self.trace3_enabled = mem.master.check_trace(3)
             self.eidolon1_enabled = mem.master.check_eidolon(1)
             self.eidolon4_enabled = mem.master.check_eidolon(4)
@@ -261,7 +262,7 @@ class LemmeHelpYou(Action):
         self.add_target(self.main_target)
         regenerate_energy(self, self.mem.master, 10, True)
         if self.main_target is not self.unit:
-            self.main_target.action_advance(self.main_target.runner_data.distance)
+            self.main_target.action_advance(10000)
         MemsSupport(self, self.main_target).apply()
 
 
@@ -269,7 +270,8 @@ class RMC(RemembranceCharacter):
     def __init__(
         self,
         team: Team,
-        stats: Stats | None = None,
+        ascension=6,
+        level=80,
         basic_level=6,
         skill_level=10,
         ult_level=10,
@@ -277,14 +279,45 @@ class RMC(RemembranceCharacter):
         memosprite_skill_level=6,
         memosprite_talent_level=6,
         eidolon_level=6,
-        trace_level=3,
+        trace_flags: tuple[bool, ...] = (True,) * 3,
+        trace_stats_flags: tuple[bool, ...] = (True,) * 10,
     ) -> None:
-        if stats is None:
-            stats = data.generate_base_stats(80, 6)
-        super().__init__("Trailblazer", "RMC", stats, team, basic_level, skill_level, ult_level, talent_level, memosprite_skill_level, memosprite_talent_level, eidolon_level, trace_level)
+        super().__init__(
+            "Trailblazer",
+            "RMC",
+            team,
+            ascension,
+            level,
+            basic_level,
+            skill_level,
+            ult_level,
+            talent_level,
+            memosprite_skill_level,
+            memosprite_talent_level,
+            eidolon_level,
+            trace_flags,
+            trace_stats_flags,
+        )
         self.e2_enabled = True
         RMCAP(self, self, False).add()
         UltActivator(self, RMCUltProvider(self, self, False)).add()
+
+    def generate_base_stats(self, ascension: int, level: int) -> Stats:
+        return data.generate_base_stats(ascension, level)
+
+    def get_trace_stats(self, *trace_stats_flags: bool) -> Stats:
+        return data.generate_trace_stats(*trace_stats_flags)
+
+    def set_eidolon(self, e1: bool, e2: bool, e3: bool, e4: bool, e5: bool, e6: bool):
+        if e3:
+            self.skill_level += 2
+            self.talent_level += 2
+            self.memosprite_talent_level += 1
+        if e5:
+            self.ult_level += 2
+            self.basic_level += 1
+            self.memosprite_skill_level += 1
+        return super().set_eidolon(e1, e2, e3, e4, e5, e6)
 
     def add(self, index=-1):
         self.listener = listen(EventTurn, self.on_turn)
@@ -293,14 +326,6 @@ class RMC(RemembranceCharacter):
         super().add(index)
         if self.check_trace(1):
             self.action_advance(data.t1_action_advance)
-        if self.check_eidolon(3):
-            self.skill_level += 2
-            self.talent_level += 2
-            self.memosprite_talent_level += 1
-        if self.check_eidolon(5):
-            self.ult_level += 2
-            self.basic_level += 1
-            self.memosprite_skill_level += 1
 
     def remove(self):
         self.listener.remove()
@@ -353,7 +378,7 @@ class RMC(RemembranceCharacter):
 
     def generate_memosprite_stats(self):
         return Stats(
-            HP(self.stats.get_stat(HP, exclusive_flag=ConvertFlag.convert).get_base() * data.talent_hp[self.talent_level - 1][0], flat=data.talent_hp[self.talent_level - 1][1]),
+            HP(self.stats.get_stat(HP, exclusive_flag=ConvertFlag.convert).get_base() * data.talent_hp_percent[self.talent_level - 1], flat=data.talent_hp_flat[self.talent_level - 1]),
             ATK(self.stats.get_stat(ATK, exclusive_flag=ConvertFlag.convert).get_base()),
             DEF(self.stats.get_stat(DEF, exclusive_flag=ConvertFlag.convert).get_base()),
             SPD(130),
@@ -369,7 +394,7 @@ class Basic(Action):
     def __init__(self, unit: Character, target: Unit) -> None:
         super().__init__("Leave It to Me!", unit, ActionFlag.attack | ActionFlag.basic | ActionFlag.single)
         self.main_target = target
-        self.scale = data.basic_dmg_scale[unit.basic_level - 1]
+        self.scale = data.basic_scale[unit.basic_level - 1]
 
     def run(self):
         assert self.main_target is not None
@@ -384,7 +409,7 @@ class Skill(Action):
         super().__init__("I Choose You!", unit, ActionFlag.skill | ActionFlag.single)
         self.main_target = unit
         self.heal_percent = data.skill_heal[unit.skill_level - 1]
-        self.energy_regenerate = data.skill_energy
+        self.energy_regenerate = data.skill_energy[unit.skill_level - 1]
 
     def run(self):
         assert isinstance(self.unit, RMC)
@@ -405,8 +430,8 @@ class Skill(Action):
 class Ult(Action):
     def __init__(self, unit: Character) -> None:
         super().__init__("Together, Mem!", unit, ActionFlag.aoe | ActionFlag.attack | ActionFlag.ult)
-        self.scale = data.ult_dmg_scale[unit.ult_level - 1]
-        self.energy_regenerate = data.ult_energy
+        self.scale = data.ult_scale[unit.ult_level - 1]
+        self.energy_regenerate = data.ult_energy[unit.ult_level - 1]
 
     def run(self):
         assert isinstance(self.unit, RMC)

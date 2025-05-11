@@ -1,86 +1,24 @@
-from game.stats import *
+from game import stats
 
-from ..utils import generate_base_stats as _generate_base_stats
-from ..utils import generate_lv10_data, generate_lv15_data
+from .. import utils
 
-basic_scale = generate_lv10_data(0.5, 0.1)
-enhaused_basic_main_scale = generate_lv10_data(1.2, 0.14)
-enhaused_basic_minor_scale = generate_lv10_data(0.5, 0.1)
-skill_dmg_boost = generate_lv15_data(0.14, 0.014, 0.0175)
-ult_scale = generate_lv15_data(1.2, 0.08, 0.1)
-talent_atk_boost = generate_lv15_data(0.36, 0.036, 0.045)
-
-trace_atk_boost = 0.28
-trace_dmg_boost = 0.144
-trace_def_boost = 0.125
-
-ascesions = [
-    {
-        "hp": {"base": 139.2, "step": 6.96},
-        "atk": {"base": 88.8, "step": 4.44},
-        "def": {"base": 60, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-    {
-        "hp": {"base": 194.88, "step": 6.96},
-        "atk": {"base": 124.32, "step": 4.44},
-        "def": {"base": 84, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-    {
-        "hp": {"base": 250.56, "step": 6.96},
-        "atk": {"base": 159.84, "step": 4.44},
-        "def": {"base": 108, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-    {
-        "hp": {"base": 306.24, "step": 6.96},
-        "atk": {"base": 195.36, "step": 4.44},
-        "def": {"base": 132, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-    {
-        "hp": {"base": 361.92, "step": 6.96},
-        "atk": {"base": 230.88, "step": 4.44},
-        "def": {"base": 156, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-    {
-        "hp": {"base": 417.6, "step": 6.96},
-        "atk": {"base": 266.4, "step": 4.44},
-        "def": {"base": 180, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-    {
-        "hp": {"base": 473.28, "step": 6.96},
-        "atk": {"base": 301.92, "step": 4.44},
-        "def": {"base": 204, "step": 3},
-        "spd": {"base": 98, "step": 0},
-        "taunt": {"base": 75, "step": 0},
-        "crit_rate": {"base": 0.05, "step": 0},
-        "crit_dmg": {"base": 0.5, "step": 0},
-    },
-]
+id = "1201"
+(basic_scale,) = utils.get_ability_data(id, 1)
+(skill_duration, skill_dmg_boost, skill_max_stack) = utils.get_ability_data(id, 2)
+(ult_scale,) = utils.get_ability_data(id, 3)
+(talent_atk_boost,) = utils.get_ability_data(id, 4)
+(technique_draw_tiles,) = utils.get_ability_data(id, 7)
+(enhaused_basic_main_scale, enhaused_basic_minor_scale) = utils.get_ability_data(id, 8)
+t1_skill_point = 1
+(t2_dmg_boost,) = utils.get_trace_data(id, 2)
+(t3_spd_boost,) = utils.get_trace_data(id, 3)
+e1_dmg_boost = 0.1
+e2_energy = 1
 
 
-def generate_base_stats(level: int, ascesion_level: int):
-    data = ascesions[ascesion_level]
-    return _generate_base_stats(data, level, 140, PathFlag.erudition, ElementFlag.quantum)
+def generate_basic_stats(ascension: int, level: int):
+    return utils.generate_base_stats(id, ascension, level, 140, stats.PathFlag.erudition, stats.ElementFlag.quantum)
+
+
+def generate_trace_stats(*trace_enabled: bool):
+    return utils.generate_trace_stats(id, *trace_enabled)

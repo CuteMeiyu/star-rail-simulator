@@ -84,21 +84,22 @@ class _ComplexStat(Stat[float]):
         return self
 
     def __repr__(self) -> str:
-        string = f"{type(self).__name__}({self.get_value()}"
+        parts = []
+        if self.get_value() > 0:
+            parts.append(f"{self.get_value()}")
         if self.get_base() > 0:
-            string += f", base={self.get_base()}"
+            parts.append(f"base={self.get_base()}")
         if self.get_flat() > 0:
-            string += f", flat={self.get_flat()}"
+            parts.append(f"flat={self.get_flat()}")
         if self.get_increase() > 0:
-            string += f", increase={self.get_increase()}"
+            parts.append(f"increase={self.get_increase()}")
         if self.get_decrease() > 0:
-            string += f", decrease={self.get_decrease()}"
+            parts.append(f"decrease={self.get_decrease()}")
         if len(self.flag) > 0:
-            string += f", flag={self.flag}"
+            parts.append(f"flag={self.flag}")
         if len(self.exclusive_flag) > 0:
-            string += f", exclusive={self.exclusive_flag}"
-        string += ")"
-        return string
+            parts.append(f"exclusive={self.exclusive_flag}")
+        return f"{type(self).__name__}({', '.join(parts)})"
 
     def get_base(self):
         return self.base
@@ -445,13 +446,19 @@ class Stats:
                 self -= stats
             self._temp_flag = backup
 
-    def __iadd__(self, other: _Self) -> _Self:
+    def add(self, other: _Self) -> _Self:
         self.children.append(other)
         return self
 
-    def __isub__(self, other: _Self) -> _Self:
+    def remove(self, other: _Self) -> _Self:
         self.children.remove(other)
         return self
+
+    def __iadd__(self, other: _Self) -> _Self:
+        return self.add(other)
+
+    def __isub__(self, other: _Self) -> _Self:
+        return self.remove(other)
 
 
 class Status:
