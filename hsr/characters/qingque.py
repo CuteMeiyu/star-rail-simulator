@@ -36,7 +36,7 @@ class Qingque(Character):
         UltActivator(self, UltProvider(self)).add()
 
     def generate_base_stats(self, ascension: int, level: int) -> Stats:
-        return data.generate_basic_stats(ascension, level)
+        return data.generate_base_stats(ascension, level)
 
     def get_trace_stats(self, *trace_stats_flags: bool) -> Stats:
         return data.generate_trace_stats(*trace_stats_flags)

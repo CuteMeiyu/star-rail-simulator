@@ -16,7 +16,7 @@ e1_dmg_boost = 0.1
 e2_energy = 1
 
 
-def generate_basic_stats(ascension: int, level: int):
+def generate_base_stats(ascension: int, level: int):
     return utils.generate_base_stats(id, ascension, level, 140, stats.PathFlag.erudition, stats.ElementFlag.quantum)
 
 
