@@ -36,6 +36,18 @@ class Character(game.Unit, abc.ABC):
     @abc.abstractmethod
     def get_trace_stats(self, *trace_stats_flags: bool) -> game.Stats: ...
 
+    def get_basic_level(self):
+        return self.basic_level
+
+    def get_skill_level(self):
+        return self.skill_level
+
+    def get_ult_level(self):
+        return self.ult_level
+
+    def get_talent_level(self):
+        return self.talent_level
+
     def set_trace(self, t1: bool, t2: bool, t3: bool):
         self.trace_flag = [t1, t2, t3]
 
@@ -87,6 +99,12 @@ class RemembranceCharacter(Character):
         self.memosprite_skill_level = memosprite_skill_level
         self.memosprite_talent_level = memosprite_talent_level
         super().__init__(name, schedule_name, team, ascension, level, basic_level, skill_level, ult_level, talent_level, eidolon_level, trace_flags, trace_stats_flags)
+
+    def get_memosprite_skill_level(self):
+        return self.memosprite_skill_level
+
+    def get_memosprite_talent_level(self):
+        return self.memosprite_talent_level
 
 
 class Memosprite(game.Unit):

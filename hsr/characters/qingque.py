@@ -41,20 +41,23 @@ class Qingque(Character):
     def get_trace_stats(self, *trace_stats_flags: bool) -> Stats:
         return data.generate_trace_stats(*trace_stats_flags)
 
-    def set_eidolon(self, e1: bool, e2: bool, e3: bool, e4: bool, e5: bool, e6: bool):
-        if e3:
-            self.ult_level += 2
-            self.talent_level += 2
-        if e5:
-            self.skill_level += 2
-            self.basic_level += 1
-        return super().set_eidolon(e1, e2, e3, e4, e5, e6)
+    def get_basic_level(self):
+        return super().get_basic_level() if not self.check_eidolon(5) else super().get_basic_level() + 1
+
+    def get_skill_level(self):
+        return super().get_skill_level() if not self.check_eidolon(5) else super().get_skill_level() + 2
+
+    def get_ult_level(self):
+        return super().get_ult_level() if not self.check_eidolon(3) else super().get_ult_level() + 2
+
+    def get_talent_level(self):
+        return super().get_talent_level() if not self.check_eidolon(3) else super().get_talent_level() + 2
 
 
 class HiddenHand(Buff):
     def __init__(self, source: Source | None, unit: Character) -> None:
         super().__init__(source, "Hidden Hand", unit, 1, TickType.start_end)
-        self.stats = Stats(ATK(increase=data.talent_atk_boost[unit.talent_level - 1]))
+        self.stats = Stats(ATK(increase=data.talent_atk_boost[unit.get_talent_level() - 1]))
 
     def add(self):
         self.unit.stats += self.stats
@@ -152,17 +155,17 @@ class Basic(Action):
     def __init__(self, unit: Character, target: Unit) -> None:
         super().__init__("Flower Pick", unit, ActionFlag.attack | ActionFlag.single | ActionFlag.basic)
         self.main_target = target
-        self.scale = data.basic_scale[unit.basic_level - 1]
 
     def run(self):
         assert self.main_target is not None
         assert isinstance(self.unit, Character)
+        scale = data.basic_scale[self.unit.get_basic_level() - 1]
         self.unit.team.gain_skill_point(self, 1)
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.pop()
         self.add_target(self.main_target)
-        deal_damage(self, self.unit, self.main_target, self.scale, 10, self.flag | ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, scale, 10, self.flag | ElementFlag.quantum)
         regenerate_energy(self, self.unit, 20, True)
         if self.unit.get_mod(AutarkyBuff):
             Autarky(self, self.unit, self.main_target).chain()
@@ -186,21 +189,21 @@ class EnhausedBasic(Action):
     def __init__(self, unit: Character, target: Unit) -> None:
         super().__init__("Cherry on Top!", unit, ActionFlag.attack | ActionFlag.blast | ActionFlag.basic)
         self.main_target = target
-        self.main_scale = data.enhaused_basic_main_scale[unit.basic_level - 1]
-        self.minor_scale = data.enhaused_basic_minor_scale[unit.basic_level - 1]
 
     def run(self):
         assert self.main_target is not None
         assert isinstance(self.unit, Character)
+        main_scale = data.enhaused_basic_main_scale[self.unit.get_basic_level() - 1]
+        minor_scale = data.enhaused_basic_minor_scale[self.unit.get_basic_level() - 1]
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.clear()
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
-        deal_damage(self, self.unit, self.main_target, self.main_scale, 20, self.flag | ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, main_scale, 20, self.flag | ElementFlag.quantum)
         for target in self.minor_targets:
-            deal_damage(self, self.unit, target, self.minor_scale, 10, self.flag | ElementFlag.quantum)
+            deal_damage(self, self.unit, target, minor_scale, 10, self.flag | ElementFlag.quantum)
         regenerate_energy(self, self.unit, 20, True)
         hidden_hand = self.unit.get_mod(HiddenHand)
         if hidden_hand is not None:
@@ -214,11 +217,11 @@ class EnhausedBasic(Action):
 
 
 class AScoopOfMoon(Buff):
-    def __init__(self, skill: "Skill", unit: Unit) -> None:
+    def __init__(self, skill: "Skill", unit: Unit, dmg_boost: float) -> None:
         super().__init__(skill, "A Scoop of Moon", unit, 1, TickType.end, max_stack=4)
-        self.skill = skill
-        self.dmg_boost = DMG_Boost(skill.dmg_boost)
-        self.stats = Stats(self.dmg_boost)
+        self.dmg_boost = dmg_boost
+        self.stat = DMG_Boost(dmg_boost)
+        self.stats = Stats(self.stat)
 
     def add(self):
         self.unit.stats += self.stats
@@ -230,7 +233,7 @@ class AScoopOfMoon(Buff):
 
     def set_stacks(self, stacks: int):
         super().set_stacks(stacks)
-        self.dmg_boost.value = self.skill.dmg_boost * self.stacks
+        self.stat.value = self.dmg_boost * self.stacks
 
 
 class ExtraTurn(Turn):
@@ -252,8 +255,10 @@ class Autarky(Action):
 
     def run(self):
         assert self.main_target is not None
+        assert isinstance(self.unit, Character)
+        scale = data.basic_scale[self.unit.get_basic_level() - 1]
         self.add_target(self.main_target)
-        deal_damage(self, self.unit, self.main_target, self.bind.scale, 10, self.flag | ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, scale, 10, self.flag | ElementFlag.quantum)
 
 
 class EnhausedAutarky(Action):
@@ -265,24 +270,27 @@ class EnhausedAutarky(Action):
 
     def run(self):
         assert self.main_target is not None
+        assert isinstance(self.unit, Character)
+        main_scale = data.enhaused_basic_main_scale[self.unit.get_basic_level() - 1]
+        minor_scale = data.enhaused_basic_minor_scale[self.unit.get_basic_level() - 1]
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
-        deal_damage(self, self.unit, self.main_target, self.bind.main_scale, 20, self.flag | ElementFlag.quantum)
+        deal_damage(self, self.unit, self.main_target, main_scale, 20, self.flag | ElementFlag.quantum)
         for target in self.minor_targets:
-            deal_damage(self, self.unit, target, self.bind.minor_scale, 10, self.flag | ElementFlag.quantum)
+            deal_damage(self, self.unit, target, minor_scale, 10, self.flag | ElementFlag.quantum)
 
 
 class Skill(Action):
     def __init__(self, unit: Character) -> None:
         super().__init__("A Scoop of Moon", unit, ActionFlag.single | ActionFlag.skill)
         self.main_target = unit
-        self.dmg_boost = data.skill_dmg_boost[unit.skill_level - 1]
-        if unit.check_trace(2):
-            self.dmg_boost += 0.1
 
     def run(self):
         assert isinstance(self.unit, Character)
+        dmg_boost = data.skill_dmg_boost[self.unit.get_skill_level() - 1]
+        if self.unit.check_trace(2):
+            dmg_boost += data.t2_dmg_boost[0]
         self.unit.team.cost_skill_point(self, 1)
         if self.unit.check_trace(1) and not self.unit.get_mod(Trace1Trigged):
             self.unit.team.gain_skill_point(self, 1)
@@ -291,7 +299,7 @@ class Skill(Action):
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.draw(2)
-        AScoopOfMoon(self, self.unit).apply()
+        AScoopOfMoon(self, self.unit, dmg_boost).apply()
         ExtraTurn(self.unit).chain()
         if self.unit.check_eidolon(4) and random.random() < 0.24 and not self.unit.get_mod(AutarkyBuff):
             AutarkyBuff(self, self.unit).apply()
@@ -300,15 +308,15 @@ class Skill(Action):
 class Ult(Action):
     def __init__(self, unit: Character) -> None:
         super().__init__("A Quartet? Woo-hoo!", unit, ActionFlag.aoe | ActionFlag.attack | ActionFlag.ult)
-        self.scale = data.ult_scale[unit.ult_level - 1]
 
     def run(self):
         assert isinstance(self.unit, Character)
+        scale = data.ult_scale[self.unit.get_ult_level() - 1]
         self.unit.status[Energy, self] -= 140
         for enemy in self.unit.select_enemies():
             self.add_target(enemy)
         for target in self.targets:
-            deal_damage(self, self.unit, target, self.scale, 20, self.flag | ElementFlag.quantum)
+            deal_damage(self, self.unit, target, scale, 20, self.flag | ElementFlag.quantum)
         regenerate_energy(self, self.unit, 5, True)
         passive = self.unit.get_mod(Passive)
         if passive is not None:

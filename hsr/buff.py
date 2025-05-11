@@ -18,6 +18,11 @@ class TickType(IntEnum):
 
 
 @dataclass
+class EventBuffApply(Event):
+    buff: "Buff"
+
+
+@dataclass
 class EventBuffAdd(Event):
     buff: "Buff"
 
@@ -72,6 +77,7 @@ class Buff(Mod):
         trigger(EventBuffRemove(self))
 
     def apply(self):
+        trigger(EventBuffApply(self))
         if exist := self.get_stack_buff():
             exist.stack(self)
         else:

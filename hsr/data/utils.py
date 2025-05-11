@@ -14,15 +14,15 @@ def generate_lv15_data(start: float, step1: float, step2: float):
     return seq1 + seq2 + seq3
 
 
-with open("star_rail_res/character_promotions.json", encoding="utf-8") as f:
+with open("hsr/data/assets/character_promotions.json", encoding="utf-8") as f:
     _ascension_data = json.load(f)
-with open("star_rail_res/character_ranks.json", encoding="utf-8") as f:
+with open("hsr/data/assets/character_ranks.json", encoding="utf-8") as f:
     _eidolon_data = json.load(f)
-with open("star_rail_res/character_skill_trees.json", encoding="utf-8") as f:
+with open("hsr/data/assets/character_skill_trees.json", encoding="utf-8") as f:
     _trace_data = json.load(f)
-with open("star_rail_res/character_skills.json", encoding="utf-8") as f:
+with open("hsr/data/assets/character_skills.json", encoding="utf-8") as f:
     _ability_data = json.load(f)
-with open("star_rail_res/characters.json", encoding="utf-8") as f:
+with open("hsr/data/assets/characters.json", encoding="utf-8") as f:
     _character_data = json.load(f)
 
 _str_base_stat_map = {
