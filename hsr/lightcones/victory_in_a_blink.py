@@ -42,7 +42,5 @@ class VictoryInABlink(Lightcone):
             return
         if event.action.unit.master is not self.unit:
             return
-        if "in_turn" not in event.action.context:
-            return
         for ally in self.unit.select_allies():
             FinalHit(self, ally).apply()

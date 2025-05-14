@@ -5,18 +5,6 @@ from game import Unit, stats
 
 from ..characters import Character, Memosprite, RemembranceCharacter
 
-
-def generate_lv10_data(start: float, step: float):
-    return [i * step + start for i in range(10)]
-
-
-def generate_lv15_data(start: float, step1: float, step2: float):
-    seq1 = [i * step1 + start for i in range(6)]
-    seq2 = [(i + 1) * step2 + seq1[-1] for i in range(4)]
-    seq3 = [(i + 1) * step1 + seq2[-1] for i in range(5)]
-    return seq1 + seq2 + seq3
-
-
 with open("hsr/data/assets/character_promotions.json", encoding="utf-8") as f:
     _ascension_data = json.load(f)
 with open("hsr/data/assets/character_ranks.json", encoding="utf-8") as f:
@@ -33,6 +21,8 @@ with open("hsr/data/assets/light_cone_ranks.json", encoding="utf-8") as f:
     _lightcone_superimposition_data = json.load(f)
 with open("hsr/data/assets/light_cones.json", encoding="utf-8") as f:
     _lightcone_data = json.load(f)
+with open("hsr/data/assets/relic_main_affixes.json", encoding="utf-8") as f:
+    _relic_main_stat_data = json.load(f)
 
 _str_base_stat_map = {
     "hp": stats.HP,
@@ -68,7 +58,7 @@ _str_trace_stat_map = {
 def generate_trace_stats(character_id: str, *trace_enabled: bool):
     data = [_trace_data[f"{character_id}2{i+1:02d}"]["levels"][0]["properties"][0] for i, enabled in enumerate(trace_enabled) if enabled]
     sum_stats_value = {}
-    for i, trace in enumerate(data):
+    for trace in data:
         if trace["type"] not in _str_trace_stat_map:
             raise ValueError(f"Unknown trace type: {trace['type']}")
         if trace["type"] not in sum_stats_value:
@@ -141,3 +131,32 @@ def generate_lightcone_base_stats(lightcone_id: str, ascension: int, level: int)
 
 def get_lightcone_data(id: str, superimposition: int):
     return _lightcone_superimposition_data[id]["params"][superimposition - 1]
+
+
+_str_slot_stat_map = {
+    "HP": (1, 1, stats.HP, "flat", {}),
+    "ATK": (2, 1, stats.ATK, "flat", {}),
+    "HP_": (3, 1, stats.HP, "increase", {}),
+    "ATK_": (3, 2, stats.ATK, "increase", {}),
+    "DEF": (3, 3, stats.DEF, "increase", {}),
+    "CRIT Rate": (3, 4, stats.CRIT_Rate, "value", {}),
+    "CRIT DMG": (3, 5, stats.CRIT_DMG, "value", {}),
+    "Outgoing Healing Boost": (3, 6, stats.Outgoing_Healing_Boost, "value", {}),
+    "Effect Hit Rate": (3, 7, stats.Effect_Hit_Rate, "value", {}),
+    "SPD": (4, 4, stats.SPD, "flat", {}),
+    "Physical DMG Boost": (5, 4, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.physical}),
+    "Fire DMG Boost": (5, 5, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.fire}),
+    "Ice DMG Boost": (5, 6, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.ice}),
+    "Lightning DMG Boost": (5, 7, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.lightning}),
+    "Wind DMG Boost": (5, 8, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.wind}),
+    "Quantum DMG Boost": (5, 9, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.quantum}),
+    "Imaginary DMG Boost": (5, 10, stats.DMG_Boost, "value", {"flag": stats.ElementFlag.imaginary}),
+    "Break Effect": (6, 1, stats.Break_Effect, "value", {}),
+    "Energy Regeneration Rate": (6, 2, stats.Energy_Regeneration_Rate, "value", {}),
+}
+
+
+def get_relic_main_stat(rarity: int, level: int, stat: str):
+    slot_id, stat_id, stat_type, value_type, kwargs = _str_slot_stat_map[stat]
+    data = _relic_main_stat_data[f"{rarity}{slot_id}"]["affixes"][str(stat_id)]
+    return stat_type(**{value_type: data["base"] + data["step"] * level, **kwargs})
