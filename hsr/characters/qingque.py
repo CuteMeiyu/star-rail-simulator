@@ -57,7 +57,7 @@ class Qingque(Character):
 class HiddenHand(Buff):
     def __init__(self, source: Source | None, unit: Character) -> None:
         super().__init__(source, "Hidden Hand", unit, 1, TickType.start_end)
-        self.stats = Stats(ATK(increase=data.talent_atk_boost[unit.get_talent_level() - 1]))
+        self.stats = Stats(ATK(increase=data.talent(unit)[0]))
 
     def add(self):
         self.unit.stats += self.stats
@@ -158,8 +158,7 @@ class Basic(Action):
 
     def run(self):
         assert self.main_target is not None
-        assert isinstance(self.unit, Character)
-        scale = data.basic_scale[self.unit.get_basic_level() - 1]
+        (scale,) = data.basic(self.unit)
         self.unit.team.gain_skill_point(self, 1)
         passive = self.unit.get_mod(Passive)
         if passive is not None:
@@ -193,8 +192,7 @@ class EnhausedBasic(Action):
     def run(self):
         assert self.main_target is not None
         assert isinstance(self.unit, Character)
-        main_scale = data.enhaused_basic_main_scale[self.unit.get_basic_level() - 1]
-        minor_scale = data.enhaused_basic_minor_scale[self.unit.get_basic_level() - 1]
+        main_scale, minor_scale = data.enhaused_basic(self.unit)
         passive = self.unit.get_mod(Passive)
         if passive is not None:
             passive.clear()
@@ -255,8 +253,7 @@ class Autarky(Action):
 
     def run(self):
         assert self.main_target is not None
-        assert isinstance(self.unit, Character)
-        scale = data.basic_scale[self.unit.get_basic_level() - 1]
+        (scale,) = data.basic(self.unit)
         self.add_target(self.main_target)
         deal_damage(self, self.unit, self.main_target, scale, 10, self.flag | ElementFlag.quantum)
 
@@ -270,9 +267,7 @@ class EnhausedAutarky(Action):
 
     def run(self):
         assert self.main_target is not None
-        assert isinstance(self.unit, Character)
-        main_scale = data.enhaused_basic_main_scale[self.unit.get_basic_level() - 1]
-        minor_scale = data.enhaused_basic_minor_scale[self.unit.get_basic_level() - 1]
+        main_scale, minor_scale = data.enhaused_basic(self.unit)
         self.add_target(self.main_target)
         for adjacent in self.main_target.select_adjacents():
             self.add_target(adjacent)
@@ -288,9 +283,9 @@ class Skill(Action):
 
     def run(self):
         assert isinstance(self.unit, Character)
-        dmg_boost = data.skill_dmg_boost[self.unit.get_skill_level() - 1]
+        (_, dmg_boost, _) = data.skill(self.unit)
         if self.unit.check_trace(2):
-            dmg_boost += data.t2_dmg_boost[0]
+            dmg_boost += 0.1
         self.unit.team.cost_skill_point(self, 1)
         if self.unit.check_trace(1) and not self.unit.get_mod(Trace1Trigged):
             self.unit.team.gain_skill_point(self, 1)
@@ -311,7 +306,7 @@ class Ult(Action):
 
     def run(self):
         assert isinstance(self.unit, Character)
-        scale = data.ult_scale[self.unit.get_ult_level() - 1]
+        (scale,) = data.ult(self.unit)
         self.unit.status[Energy, self] -= 140
         for enemy in self.unit.select_enemies():
             self.add_target(enemy)

@@ -1,6 +1,9 @@
 import json
+from typing import Any, Literal
 
-from game import stats
+from game import Unit, stats
+
+from ..characters import Character, Memosprite, RemembranceCharacter
 
 
 def generate_lv10_data(start: float, step: float):
@@ -72,11 +75,54 @@ def generate_trace_stats(character_id: str, *trace_enabled: bool):
     return stats.Stats(*stat_list)
 
 
-def get_ability_data(character_id: str, ability: int):
-    params = _ability_data[f"{character_id}{ability:02d}"]["params"]
-    return tuple(zip(*params))
+AbilityType = Literal["basic", "skill", "ult", "talent", "memosprite_skill", "memosprite_talent", "technique"]
+
+
+class AbilityData:
+    def __init__(self, data: tuple, ability_type: AbilityType) -> None:
+        self.data = data
+        self.ability_type = ability_type
+
+    def __call__(self, unit: Unit) -> Any:
+        match self.ability_type:
+            case "basic":
+                assert isinstance(unit, Character)
+                return self.data[unit.get_basic_level() - 1]
+            case "skill":
+                assert isinstance(unit, Character)
+                return self.data[unit.get_skill_level() - 1]
+            case "ult":
+                assert isinstance(unit, Character)
+                return self.data[unit.get_ult_level() - 1]
+            case "talent":
+                assert isinstance(unit, Character)
+                return self.data[unit.get_talent_level() - 1]
+            case "memosprite_skill":
+                if isinstance(unit, Memosprite):
+                    return self.data[unit.master.get_memosprite_skill_level() - 1]
+                assert isinstance(unit, RemembranceCharacter)
+                return self.data[unit.get_memosprite_skill_level() - 1]
+            case "memosprite_talent":
+                if isinstance(unit, Memosprite):
+                    return self.data[unit.master.get_memosprite_talent_level() - 1]
+                assert isinstance(unit, RemembranceCharacter)
+                return self.data[unit.get_memosprite_talent_level() - 1]
+            case "technique":
+                return self.data[0]
+        raise ValueError(f"unknwon ability_type: {self.ability_type}")
+
+
+def get_ability_data(character_id: str, ability: int, level_type: AbilityType):
+    return AbilityData(_ability_data[f"{character_id}{ability:02d}"]["params"], level_type)
+
+
+def get_abilities_data(character_id: str, ability_type_tuple: list[tuple[int, AbilityType]]):
+    return tuple(get_ability_data(character_id, aid, typ) for aid, typ in ability_type_tuple)
+
+
+def get_character_abilities_data(id: str):
+    return get_abilities_data(id, [(1, "basic"), (2, "skill"), (3, "ult"), (4, "talent")])
 
 
 def get_trace_data(character_id: str, trace: int):
-    params = _trace_data[f"{character_id}1{trace:02d}"]["params"]
-    return tuple(zip(*params))
+    return tuple(_trace_data[f"{character_id}1{trace:02d}"]["params"][0])
