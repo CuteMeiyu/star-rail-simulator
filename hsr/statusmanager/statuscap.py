@@ -7,6 +7,7 @@ from game.events import EventStatusChange
 from game.stats import *
 
 from ..priority import Priority
+from .status.hp import Damage
 
 
 @dataclass
@@ -18,6 +19,11 @@ class Death(UnitNode, Source):
     def __init__(self, source: Source | None, unit: Unit, priority=Priority.Node.death) -> None:
         super().__init__(unit, priority)
         Source.__init__(self, source)
+
+    def get_killer(self):
+        if (damage := self.get_source(Damage)) is not None:
+            return damage.source_unit
+        return self.get_source(Unit)
 
     def run(self):
         self.unit.status[Alive] = False

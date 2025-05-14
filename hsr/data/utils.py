@@ -27,6 +27,12 @@ with open("hsr/data/assets/character_skills.json", encoding="utf-8") as f:
     _ability_data = json.load(f)
 with open("hsr/data/assets/characters.json", encoding="utf-8") as f:
     _character_data = json.load(f)
+with open("hsr/data/assets/light_cone_promotions.json", encoding="utf-8") as f:
+    _lightcone_ascension_data = json.load(f)
+with open("hsr/data/assets/light_cone_ranks.json", encoding="utf-8") as f:
+    _lightcone_superimposition_data = json.load(f)
+with open("hsr/data/assets/light_cones.json", encoding="utf-8") as f:
+    _lightcone_data = json.load(f)
 
 _str_base_stat_map = {
     "hp": stats.HP,
@@ -39,7 +45,7 @@ _str_base_stat_map = {
 }
 
 
-def generate_base_stats(character_id: str, ascension: int, level: int, energy: float, path: stats.PathFlag, element: stats.ElementFlag):
+def generate_character_base_stats(character_id: str, ascension: int, level: int, energy: float, path: stats.PathFlag, element: stats.ElementFlag):
     data = _ascension_data[character_id]["values"]
     return stats.Stats(
         *[_str_base_stat_map[stat](base_step["base"] + base_step["step"] * (level - 1)) for stat, base_step in data[ascension].items()],
@@ -126,3 +132,12 @@ def get_character_abilities_data(id: str):
 
 def get_trace_data(character_id: str, trace: int):
     return tuple(_trace_data[f"{character_id}1{trace:02d}"]["params"][0])
+
+
+def generate_lightcone_base_stats(lightcone_id: str, ascension: int, level: int):
+    data = _lightcone_ascension_data[lightcone_id]["values"]
+    return stats.Stats(*[_str_base_stat_map[stat](base_step["base"] + base_step["step"] * (level - 1)) for stat, base_step in data[ascension].items()])
+
+
+def get_lightcone_data(id: str, superimposition: int):
+    return _lightcone_superimposition_data[id]["params"][superimposition - 1]

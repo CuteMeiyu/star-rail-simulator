@@ -392,19 +392,22 @@ class Stats:
 
     @property
     def all_stats(self):
-        packs: list[tuple[type[Stat], _MixFlag, _MixFlag]] = []
+        pack_stat_dict: dict[tuple[type[Stat], str], Stat] = {}
         stack: list[Stats] = [self]
         while len(stack) > 0:
             child = stack.pop()
             for stat in child.stats:
-                pack = type(stat), stat.flag, stat.exclusive_flag
-                if pack not in packs:
-                    packs.append(pack)
+                pack = type(stat), str(stat.flag)
+                if pack not in pack_stat_dict:
+                    new_stat = type(stat)(flag=stat.flag)
+                    new_stat += stat
+                    pack_stat_dict[pack] = new_stat
+                else:
+                    pack_stat_dict[pack] += stat
             stack.extend(child.children)
-        packs.sort(key=lambda p: p[0].__name__)
         results: list[Stat] = []
-        for stat_type, flag, exclusive_flag in packs:
-            results.append(self.get_stat(stat_type, flag=flag, exclusive_flag=exclusive_flag))
+        for (_, _), stat in sorted(pack_stat_dict.items(), key=lambda x: x[0][0].__name__):
+            results.append(stat)
         return results
 
     def get_stat(self, stat_type: type[_T_Stat], no_child=False, **kwargs: _Any) -> _T_Stat:

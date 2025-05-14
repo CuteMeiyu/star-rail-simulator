@@ -1,6 +1,6 @@
 import console
 import hsr
-from hsr import characters, enemies, events, multipiers
+from hsr import characters, enemies, events, lightcones, multipiers
 
 
 def event_print(event: hsr.Event):
@@ -70,8 +70,12 @@ def main():
     team2 = hsr.Team(battle1)
     team2.add()
     team1.add()
-    characters.Qingque(team1).add()
-    characters.RMC(team1).add()
+    qq = characters.Qingque(team1)
+    lightcones.GeniusesRepose(qq).add()
+    qq.add()
+    rmc = characters.RMC(team1)
+    lightcones.VictoryInABlink(rmc).add()
+    rmc.add()
     for i in range(4):
         dm = enemies.Dummy(team2)
         dm.add()

@@ -10,7 +10,7 @@ mem_basic, mem_skill, mem_talent = utils.get_abilities_data(mem_id, [(1, "memosp
 
 
 def generate_base_stats(ascension: int, level: int):
-    return utils.generate_base_stats(id, ascension, level, 160, stats.PathFlag.remembrance, stats.ElementFlag.ice)
+    return utils.generate_character_base_stats(id, ascension, level, 160, stats.PathFlag.remembrance, stats.ElementFlag.ice)
 
 
 def generate_trace_stats(*trace_enabled: bool):

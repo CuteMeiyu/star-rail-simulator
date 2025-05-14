@@ -143,6 +143,8 @@ class MixFlag:
 
     def __eq__(self, other: object):
         assert isinstance(other, MixFlag)
+        if len(self.flag_dict) != len(other.flag_dict):
+            return False
         for flag_type, flag in self.flag_dict.items():
             if flag_type not in other.flag_dict:
                 return False

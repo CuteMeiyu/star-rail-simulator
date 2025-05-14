@@ -1,9 +1,10 @@
 import game
 
 
-class Lightcone(game.SourcelessMod):
-    def __init__(self, unit: game.Unit, stats: game.Stats) -> None:
-        super().__init__(unit)
+class Lightcone(game.Mod):
+    def __init__(self, name: str, unit: game.Unit, stats: game.Stats) -> None:
+        super().__init__(unit, unit)
+        self.name = name
         self.stats = stats
 
     def add(self):
