@@ -1,6 +1,6 @@
 import console
 import hsr
-from hsr import characters, enemies, events, lightcones, multipiers
+from hsr import characters, enemies, events, lightcones, multipiers, relics
 
 
 def event_print(event: hsr.Event):
@@ -72,9 +72,11 @@ def main():
     team1.add()
     qq = characters.Qingque(team1)
     lightcones.GeniusesRepose(qq).add()
+    relics.GeniusOfBrilliantStars(qq, hsr.Stats(), True).add()
     qq.add()
     rmc = characters.RMC(team1)
     lightcones.VictoryInABlink(rmc).add()
+    relics.HeroOfTriumphantSong(rmc, hsr.Stats(), True).add()
     rmc.add()
     for i in range(4):
         dm = enemies.Dummy(team2)
